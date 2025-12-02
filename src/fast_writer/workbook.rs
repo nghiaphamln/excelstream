@@ -169,7 +169,7 @@ impl FastWorkbook {
         self.zip.write_all(&self.xml_buffer)?;
 
         // Flush định kỳ để giới hạn memory
-        if self.current_row % self.flush_interval == 0 {
+        if self.current_row.is_multiple_of(self.flush_interval) {
             self.zip.flush()?;
         }
 
