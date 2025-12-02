@@ -1,6 +1,6 @@
 [package]
 name = "excelstream"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Ton That Vu <ttvuhm@gmail.com>"]
 description = "High-performance streaming Excel library - Read/write large XLSX files with memory-efficient streaming"
@@ -8,6 +8,16 @@ license = "MIT"
 repository = "https://github.com/KSD-CO/excelstream"
 keywords = ["excel", "xlsx", "streaming", "fast", "memory-efficient"]
 categories = ["parsing", "encoding"]
+exclude = [
+    "*.xlsx",
+    "*.xls",
+    "examples/*.xlsx",
+    "examples/*.xls",
+    "tests/data/*.xlsx",
+    "tests/data/*.xls",
+    "benches/results/",
+    "memory_test_*.xlsx",
+]
 
 [dependencies]
 calamine = "0.32"
