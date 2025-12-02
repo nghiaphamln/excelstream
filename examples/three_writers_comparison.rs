@@ -407,7 +407,7 @@ fn generate_mixed_row_strings(row_num: usize, num_cols: usize) -> Vec<String> {
             2 => format!("user{}@example.com", row_num),                      // Email
             3 => format!("{}", 20 + (row_num % 50)),                          // Age (as string)
             4 => format!("{:.2}", 30000.0 + (row_num as f64 * 123.45)),       // Salary (as string)
-            5 => if row_num % 2 == 0 { "true" } else { "false" }.to_string(), // Active (as string)
+            5 => if row_num.is_multiple_of(2) { "true" } else { "false" }.to_string(), // Active (as string)
             6 => format!("{:.1}", 50.0 + (row_num % 50) as f64),              // Score (as string)
             7 => match row_num % 5 {
                 0 => "Engineering",
@@ -507,7 +507,7 @@ fn generate_mixed_row_typed(row_num: usize, num_cols: usize) -> Vec<CellValue> {
             2 => CellValue::String(format!("user{}@example.com", row_num)), // Email
             3 => CellValue::Int((20 + (row_num % 50)) as i64), // Age as number
             4 => CellValue::Float(30000.0 + (row_num as f64 * 123.45)), // Salary as float
-            5 => CellValue::Bool(row_num % 2 == 0), // Active as boolean
+            5 => CellValue::Bool(row_num.is_multiple_of(2)), // Active as boolean
             6 => CellValue::Float(50.0 + (row_num % 50) as f64), // Score as float
             7 => CellValue::String(
                 match row_num % 5 {
