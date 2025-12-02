@@ -7,9 +7,11 @@
 //! - Error handling and recovery
 //! - Custom query support
 //! - Multiple sheet export
+//! - Typed values for +40% better performance
 
 use deadpool_postgres::{Config, Pool, Runtime};
-use excelstream::fast_writer::FastWorkbook;
+use excelstream::writer::ExcelWriter;
+use excelstream::types::CellValue;
 use std::time::Instant;
 use tokio_postgres::NoTls;
 
@@ -71,7 +73,7 @@ async fn export_table(
     pool: &Pool,
     query: &str,
     output_file: &str,
-    sheet_name: &str,
+    _sheet_name: &str,  // Not used in v0.2.0 (ExcelWriter creates default "Sheet1")
 ) -> Result<(), Box<dyn std::error::Error>> {
     let start = Instant::now();
 
@@ -84,12 +86,15 @@ async fn export_table(
 
     println!("  Found {} rows", row_count);
 
-    // Create workbook
-    let mut workbook = FastWorkbook::new(output_file)?;
-    workbook.add_worksheet(sheet_name)?;
+    // Create writer
+    let mut writer = ExcelWriter::new(output_file)?;
+    
+    // Configure for optimal performance
+    writer.set_flush_interval(1000);
+    writer.set_max_buffer_size(1024 * 1024);
 
     if rows.is_empty() {
-        workbook.close()?;
+        writer.save()?;
         println!("  No data to export");
         return Ok(());
     }
@@ -98,20 +103,19 @@ async fn export_table(
     let first_row = &rows[0];
     let columns: Vec<&str> = first_row.columns().iter().map(|col| col.name()).collect();
 
-    workbook.write_row(&columns)?;
+    writer.write_header(&columns)?;
 
-    // Write data rows
+    // Write data rows with typed values
     println!("  Writing data...");
     for (idx, row) in rows.iter().enumerate() {
-        let mut row_data: Vec<String> = Vec::new();
+        let mut row_data: Vec<CellValue> = Vec::new();
 
         for col_idx in 0..row.len() {
-            let value = format_cell_value(row, col_idx);
+            let value = format_cell_value_typed(row, col_idx);
             row_data.push(value);
         }
 
-        let row_refs: Vec<&str> = row_data.iter().map(|s| s.as_str()).collect();
-        workbook.write_row(&row_refs)?;
+        writer.write_row_typed(&row_data)?;
 
         // Progress indicator
         if (idx + 1) % 10000 == 0 {
@@ -119,7 +123,7 @@ async fn export_table(
         }
     }
 
-    workbook.close()?;
+    writer.save()?;
 
     let duration = start.elapsed();
     println!("  ✓ Exported {} rows in {:?}", row_count, duration);
@@ -137,7 +141,11 @@ async fn export_multiple_tables(pool: &Pool) -> Result<(), Box<dyn std::error::E
     let start = Instant::now();
     let output_file = "multi_table_export.xlsx";
 
-    let mut workbook = FastWorkbook::new(output_file)?;
+    let mut writer = ExcelWriter::new(output_file)?;
+    
+    // Configure for optimal performance
+    writer.set_flush_interval(1000);
+    writer.set_max_buffer_size(1024 * 1024);
 
     // Define queries for different sheets
     let queries = vec![
@@ -157,12 +165,15 @@ async fn export_multiple_tables(pool: &Pool) -> Result<(), Box<dyn std::error::E
 
     let client = pool.get().await?;
 
-    for (sheet_name, query) in queries {
+    for (idx, (sheet_name, query)) in queries.iter().enumerate() {
         println!("  Processing sheet: {}", sheet_name);
 
-        workbook.add_worksheet(sheet_name)?;
+        // Add new sheet (first sheet already exists)
+        if idx > 0 {
+            writer.add_sheet(sheet_name)?;
+        }
 
-        let rows = client.query(query, &[]).await?;
+        let rows = client.query(*query, &[]).await?;
 
         if rows.is_empty() {
             continue;
@@ -170,22 +181,21 @@ async fn export_multiple_tables(pool: &Pool) -> Result<(), Box<dyn std::error::E
 
         // Write header
         let columns: Vec<&str> = rows[0].columns().iter().map(|col| col.name()).collect();
-        workbook.write_row(&columns)?;
+        writer.write_header(&columns)?;
 
-        // Write data
+        // Write data with typed values
         for row in &rows {
-            let mut row_data: Vec<String> = Vec::new();
+            let mut row_data: Vec<CellValue> = Vec::new();
             for col_idx in 0..row.len() {
-                row_data.push(format_cell_value(row, col_idx));
+                row_data.push(format_cell_value_typed(row, col_idx));
             }
-            let row_refs: Vec<&str> = row_data.iter().map(|s| s.as_str()).collect();
-            workbook.write_row(&row_refs)?;
+            writer.write_row_typed(&row_data)?;
         }
 
         println!("    ✓ {} rows written", rows.len());
     }
 
-    workbook.close()?;
+    writer.save()?;
 
     println!("  ✓ Multi-table export completed in {:?}", start.elapsed());
     println!("  ✓ File: {}", output_file);
@@ -193,8 +203,8 @@ async fn export_multiple_tables(pool: &Pool) -> Result<(), Box<dyn std::error::E
     Ok(())
 }
 
-/// Format a PostgreSQL cell value to string
-fn format_cell_value(row: &tokio_postgres::Row, col_idx: usize) -> String {
+/// Format a PostgreSQL cell value to CellValue (typed)
+fn format_cell_value_typed(row: &tokio_postgres::Row, col_idx: usize) -> CellValue {
     use tokio_postgres::types::Type;
 
     let column = &row.columns()[col_idx];
@@ -202,47 +212,49 @@ fn format_cell_value(row: &tokio_postgres::Row, col_idx: usize) -> String {
     match *column.type_() {
         Type::INT2 => row
             .try_get::<_, i16>(col_idx)
-            .map(|v| v.to_string())
-            .unwrap_or_default(),
+            .map(|v| CellValue::Int(v as i64))
+            .unwrap_or(CellValue::Empty),
         Type::INT4 => row
             .try_get::<_, i32>(col_idx)
-            .map(|v| v.to_string())
-            .unwrap_or_default(),
+            .map(|v| CellValue::Int(v as i64))
+            .unwrap_or(CellValue::Empty),
         Type::INT8 => row
             .try_get::<_, i64>(col_idx)
-            .map(|v| v.to_string())
-            .unwrap_or_default(),
+            .map(CellValue::Int)
+            .unwrap_or(CellValue::Empty),
         Type::FLOAT4 => row
             .try_get::<_, f32>(col_idx)
-            .map(|v| v.to_string())
-            .unwrap_or_default(),
+            .map(|v| CellValue::Float(v as f64))
+            .unwrap_or(CellValue::Empty),
         Type::FLOAT8 => row
             .try_get::<_, f64>(col_idx)
-            .map(|v| v.to_string())
-            .unwrap_or_default(),
-        Type::VARCHAR | Type::TEXT | Type::BPCHAR => {
-            row.try_get::<_, String>(col_idx).unwrap_or_default()
-        }
+            .map(CellValue::Float)
+            .unwrap_or(CellValue::Empty),
+        Type::VARCHAR | Type::TEXT | Type::BPCHAR => row
+            .try_get::<_, String>(col_idx)
+            .map(CellValue::String)
+            .unwrap_or(CellValue::Empty),
         Type::TIMESTAMP => row
             .try_get::<_, chrono::NaiveDateTime>(col_idx)
-            .map(|v| v.format("%Y-%m-%d %H:%M:%S").to_string())
-            .unwrap_or_default(),
+            .map(|v| CellValue::String(v.format("%Y-%m-%d %H:%M:%S").to_string()))
+            .unwrap_or(CellValue::Empty),
         Type::TIMESTAMPTZ => row
             .try_get::<_, chrono::DateTime<chrono::Utc>>(col_idx)
-            .map(|v| v.format("%Y-%m-%d %H:%M:%S %Z").to_string())
-            .unwrap_or_default(),
+            .map(|v| CellValue::String(v.format("%Y-%m-%d %H:%M:%S %Z").to_string()))
+            .unwrap_or(CellValue::Empty),
         Type::DATE => row
             .try_get::<_, chrono::NaiveDate>(col_idx)
-            .map(|v| v.format("%Y-%m-%d").to_string())
-            .unwrap_or_default(),
+            .map(|v| CellValue::String(v.format("%Y-%m-%d").to_string()))
+            .unwrap_or(CellValue::Empty),
         Type::BOOL => row
             .try_get::<_, bool>(col_idx)
-            .map(|v| v.to_string())
-            .unwrap_or_default(),
+            .map(CellValue::Bool)
+            .unwrap_or(CellValue::Empty),
         _ => {
             // For other types, try to get as string
             row.try_get::<_, String>(col_idx)
-                .unwrap_or_else(|_| "NULL".to_string())
+                .map(CellValue::String)
+                .unwrap_or(CellValue::Empty)
         }
     }
 }
