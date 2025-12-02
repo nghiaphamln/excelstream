@@ -12,7 +12,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     test_fast_writer("fast_small.xlsx", 1_000)?;
     let duration = start.elapsed();
     println!("  Time: {:?}", duration);
-    println!("  Speed: {:.0} rows/sec\n", 1_000.0 / duration.as_secs_f64());
+    println!(
+        "  Speed: {:.0} rows/sec\n",
+        1_000.0 / duration.as_secs_f64()
+    );
 
     // Test 2: Medium dataset
     println!("Test 2: Writing 10,000 rows...");
@@ -20,7 +23,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     test_fast_writer("fast_medium.xlsx", 10_000)?;
     let duration = start.elapsed();
     println!("  Time: {:?}", duration);
-    println!("  Speed: {:.0} rows/sec\n", 10_000.0 / duration.as_secs_f64());
+    println!(
+        "  Speed: {:.0} rows/sec\n",
+        10_000.0 / duration.as_secs_f64()
+    );
 
     // Test 3: Large dataset
     println!("Test 3: Writing 100,000 rows...");
@@ -28,7 +34,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     test_fast_writer("fast_large.xlsx", 100_000)?;
     let duration = start.elapsed();
     println!("  Time: {:?}", duration);
-    println!("  Speed: {:.0} rows/sec\n", 100_000.0 / duration.as_secs_f64());
+    println!(
+        "  Speed: {:.0} rows/sec\n",
+        100_000.0 / duration.as_secs_f64()
+    );
 
     // Test 4: Very large dataset
     println!("Test 4: Writing 1,000,000 rows...");
@@ -36,7 +45,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     test_fast_writer("fast_xlarge.xlsx", 1_000_000)?;
     let duration = start.elapsed();
     println!("  Time: {:?}", duration);
-    println!("  Speed: {:.0} rows/sec\n", 1_000_000.0 / duration.as_secs_f64());
+    println!(
+        "  Speed: {:.0} rows/sec\n",
+        1_000_000.0 / duration.as_secs_f64()
+    );
 
     Ok(())
 }

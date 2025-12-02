@@ -1,7 +1,7 @@
 //! Optimized XML writer with minimal allocations
 
-use std::io::Write;
 use crate::error::Result;
+use std::io::Write;
 
 /// Fast XML writer that writes directly to output without intermediate buffers
 pub struct XmlWriter<W: Write> {
@@ -121,14 +121,14 @@ mod tests {
     fn test_xml_writer() {
         let mut output = Vec::new();
         let mut writer = XmlWriter::new(&mut output);
-        
+
         writer.start_element("root").unwrap();
         writer.attribute("attr", "value").unwrap();
         writer.close_start_tag().unwrap();
         writer.write_str("content").unwrap();
         writer.end_element("root").unwrap();
         writer.flush().unwrap();
-        
+
         assert_eq!(
             String::from_utf8(output).unwrap(),
             "<root attr=\"value\">content</root>"
@@ -139,10 +139,10 @@ mod tests {
     fn test_xml_escaping() {
         let mut output = Vec::new();
         let mut writer = XmlWriter::new(&mut output);
-        
+
         writer.write_escaped("<test>&value</test>").unwrap();
         writer.flush().unwrap();
-        
+
         assert_eq!(
             String::from_utf8(output).unwrap(),
             "&lt;test&gt;&amp;value&lt;/test&gt;"

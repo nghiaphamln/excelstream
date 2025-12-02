@@ -1,7 +1,7 @@
 //! Helper functions để tự động cấu hình memory constraints
 
-use crate::fast_writer::FastWorkbook;
 use crate::error::Result;
+use crate::fast_writer::FastWorkbook;
 use std::path::Path;
 
 /// Memory profile cho các loại pods khác nhau
@@ -14,7 +14,10 @@ pub enum MemoryProfile {
     /// Pods lớn (> 1GB): flush mỗi 1000 rows, buffer 1MB (default)
     High,
     /// Custom profile
-    Custom { flush_interval: u32, max_buffer_size: usize },
+    Custom {
+        flush_interval: u32,
+        max_buffer_size: usize,
+    },
 }
 
 impl MemoryProfile {
@@ -52,7 +55,10 @@ impl MemoryProfile {
                 workbook.set_flush_interval(1000);
                 workbook.set_max_buffer_size(1024 * 1024);
             }
-            MemoryProfile::Custom { flush_interval, max_buffer_size } => {
+            MemoryProfile::Custom {
+                flush_interval,
+                max_buffer_size,
+            } => {
                 workbook.set_flush_interval(*flush_interval);
                 workbook.set_max_buffer_size(*max_buffer_size);
             }
@@ -82,8 +88,17 @@ mod tests {
 
     #[test]
     fn test_memory_profile_from_mb() {
-        assert!(matches!(MemoryProfile::from_memory_mb(256), MemoryProfile::Low));
-        assert!(matches!(MemoryProfile::from_memory_mb(768), MemoryProfile::Medium));
-        assert!(matches!(MemoryProfile::from_memory_mb(2048), MemoryProfile::High));
+        assert!(matches!(
+            MemoryProfile::from_memory_mb(256),
+            MemoryProfile::Low
+        ));
+        assert!(matches!(
+            MemoryProfile::from_memory_mb(768),
+            MemoryProfile::Medium
+        ));
+        assert!(matches!(
+            MemoryProfile::from_memory_mb(2048),
+            MemoryProfile::High
+        ));
     }
 }

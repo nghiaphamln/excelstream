@@ -1,7 +1,7 @@
 //! Streaming write example - Write large Excel files efficiently
 
-use excelstream::ExcelWriter;
 use excelstream::types::CellValue;
+use excelstream::ExcelWriter;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Streaming write example - Creating large Excel file");
@@ -11,13 +11,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut writer = ExcelWriter::new("examples/large_output.xlsx")?;
 
     // Write header
-    writer.write_header(&[
-        "ID",
-        "Name",
-        "Value",
-        "Timestamp",
-        "Status",
-    ])?;
+    writer.write_header(["ID", "Name", "Value", "Timestamp", "Status"])?;
 
     println!("Generating and writing data...");
 

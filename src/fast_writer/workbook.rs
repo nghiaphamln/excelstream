@@ -6,10 +6,10 @@ use std::path::Path;
 use zip::write::{FileOptions, ZipWriter};
 use zip::CompressionMethod;
 
-use crate::error::Result;
 use super::shared_strings::SharedStrings;
 use super::worksheet::FastWorksheet;
 use super::xml_writer::XmlWriter;
+use crate::error::Result;
 
 /// Fast workbook for high-performance Excel writing
 pub struct FastWorkbook {
@@ -19,10 +19,10 @@ pub struct FastWorkbook {
     worksheet_count: u32,
     current_worksheet: Option<u32>,
     current_row: u32,
-    xml_buffer: Vec<u8>, // Reusable buffer for XML writing
+    xml_buffer: Vec<u8>,         // Reusable buffer for XML writing
     cell_ref_cache: Vec<String>, // Cache for cell references (A, B, C, ...)
-    flush_interval: u32, // Flush every N rows
-    max_buffer_size: usize, // Max buffer size before force flush
+    flush_interval: u32,         // Flush every N rows
+    max_buffer_size: usize,      // Max buffer size before force flush
 }
 
 impl FastWorkbook {
@@ -67,7 +67,7 @@ impl FastWorkbook {
             current_row: 0,
             xml_buffer: Vec::with_capacity(8192),
             cell_ref_cache,
-            flush_interval: 1000, // Flush mỗi 1000 dòng
+            flush_interval: 1000,         // Flush mỗi 1000 dòng
             max_buffer_size: 1024 * 1024, // 1MB max buffer
         })
     }
@@ -91,7 +91,7 @@ impl FastWorkbook {
 
         self.worksheet_count += 1;
         let sheet_id = self.worksheet_count;
-        
+
         self.worksheets.push(name.to_string());
 
         let options = FileOptions::default()
@@ -105,8 +105,14 @@ impl FastWorkbook {
         let mut xml_writer = XmlWriter::new(&mut self.zip);
         xml_writer.write_str("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")?;
         xml_writer.start_element("worksheet")?;
-        xml_writer.attribute("xmlns", "http://schemas.openxmlformats.org/spreadsheetml/2006/main")?;
-        xml_writer.attribute("xmlns:r", "http://schemas.openxmlformats.org/officeDocument/2006/relationships")?;
+        xml_writer.attribute(
+            "xmlns",
+            "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+        )?;
+        xml_writer.attribute(
+            "xmlns:r",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        )?;
         xml_writer.close_start_tag()?;
         xml_writer.start_element("sheetData")?;
         xml_writer.close_start_tag()?;
@@ -120,47 +126,53 @@ impl FastWorkbook {
     /// Write a row to the current worksheet
     pub fn write_row(&mut self, values: &[&str]) -> Result<()> {
         if self.current_worksheet.is_none() {
-            return Err(crate::error::ExcelError::WriteError("No active worksheet".to_string()));
+            return Err(crate::error::ExcelError::WriteError(
+                "No active worksheet".to_string(),
+            ));
         }
 
         self.current_row += 1;
         let row_num = self.current_row;
-        
+
         // Build XML in buffer
         self.xml_buffer.clear();
         self.xml_buffer.extend_from_slice(b"<row r=\"");
-        self.xml_buffer.extend_from_slice(row_num.to_string().as_bytes());
+        self.xml_buffer
+            .extend_from_slice(row_num.to_string().as_bytes());
         self.xml_buffer.extend_from_slice(b"\">");
 
         for (col_idx, value) in values.iter().enumerate() {
             let string_index = self.shared_strings.add_string(value);
-            
+
             // Use cached column letter if available
             let col_num = (col_idx + 1) as u32;
-            
+
             self.xml_buffer.extend_from_slice(b"<c r=\"");
             if col_num <= self.cell_ref_cache.len() as u32 {
-                self.xml_buffer.extend_from_slice(self.cell_ref_cache[col_idx].as_bytes());
+                self.xml_buffer
+                    .extend_from_slice(self.cell_ref_cache[col_idx].as_bytes());
             } else {
                 let col_letter = Self::col_to_letter(col_num);
                 self.xml_buffer.extend_from_slice(col_letter.as_bytes());
             }
-            self.xml_buffer.extend_from_slice(row_num.to_string().as_bytes());
+            self.xml_buffer
+                .extend_from_slice(row_num.to_string().as_bytes());
             self.xml_buffer.extend_from_slice(b"\" t=\"s\"><v>");
-            self.xml_buffer.extend_from_slice(string_index.to_string().as_bytes());
+            self.xml_buffer
+                .extend_from_slice(string_index.to_string().as_bytes());
             self.xml_buffer.extend_from_slice(b"</v></c>");
         }
 
         self.xml_buffer.extend_from_slice(b"</row>");
-        
+
         // Write buffer to zip
         self.zip.write_all(&self.xml_buffer)?;
-        
+
         // Flush định kỳ để giới hạn memory
         if self.current_row % self.flush_interval == 0 {
             self.zip.flush()?;
         }
-        
+
         Ok(())
     }
 
@@ -190,7 +202,10 @@ impl FastWorkbook {
     }
 
     /// Finish a worksheet and restore shared strings
-    pub fn finish_worksheet(&mut self, _worksheet: FastWorksheet<&mut ZipWriter<BufWriter<File>>>) -> Result<()> {
+    pub fn finish_worksheet(
+        &mut self,
+        _worksheet: FastWorksheet<&mut ZipWriter<BufWriter<File>>>,
+    ) -> Result<()> {
         // This method is no longer needed with the new API
         // Keeping for backward compatibility but it does nothing
         Ok(())
@@ -285,11 +300,17 @@ impl FastWorkbook {
 
     fn write_workbook_xml(&mut self) -> Result<()> {
         let mut xml_writer = XmlWriter::new(&mut self.zip);
-        
+
         xml_writer.write_str("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")?;
         xml_writer.start_element("workbook")?;
-        xml_writer.attribute("xmlns", "http://schemas.openxmlformats.org/spreadsheetml/2006/main")?;
-        xml_writer.attribute("xmlns:r", "http://schemas.openxmlformats.org/officeDocument/2006/relationships")?;
+        xml_writer.attribute(
+            "xmlns",
+            "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+        )?;
+        xml_writer.attribute(
+            "xmlns:r",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        )?;
         xml_writer.close_start_tag()?;
 
         // Sheets
@@ -308,23 +329,29 @@ impl FastWorkbook {
         xml_writer.end_element("sheets")?;
         xml_writer.end_element("workbook")?;
         xml_writer.flush()?;
-        
+
         Ok(())
     }
 
     fn write_workbook_rels(&mut self) -> Result<()> {
         let mut xml_writer = XmlWriter::new(&mut self.zip);
-        
+
         xml_writer.write_str("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")?;
         xml_writer.start_element("Relationships")?;
-        xml_writer.attribute("xmlns", "http://schemas.openxmlformats.org/package/2006/relationships")?;
+        xml_writer.attribute(
+            "xmlns",
+            "http://schemas.openxmlformats.org/package/2006/relationships",
+        )?;
         xml_writer.close_start_tag()?;
 
         for i in 0..self.worksheet_count {
             let rid = i + 1;
             xml_writer.start_element("Relationship")?;
             xml_writer.attribute("Id", &format!("rId{}", rid))?;
-            xml_writer.attribute("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet")?;
+            xml_writer.attribute(
+                "Type",
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
+            )?;
             xml_writer.attribute("Target", &format!("worksheets/sheet{}.xml", rid))?;
             xml_writer.write_raw(b"/>")?;
         }
@@ -333,7 +360,10 @@ impl FastWorkbook {
         let styles_rid = self.worksheet_count + 1;
         xml_writer.start_element("Relationship")?;
         xml_writer.attribute("Id", &format!("rId{}", styles_rid))?;
-        xml_writer.attribute("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles")?;
+        xml_writer.attribute(
+            "Type",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles",
+        )?;
         xml_writer.attribute("Target", "styles.xml")?;
         xml_writer.write_raw(b"/>")?;
 
@@ -341,13 +371,16 @@ impl FastWorkbook {
         let ss_rid = self.worksheet_count + 2;
         xml_writer.start_element("Relationship")?;
         xml_writer.attribute("Id", &format!("rId{}", ss_rid))?;
-        xml_writer.attribute("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings")?;
+        xml_writer.attribute(
+            "Type",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings",
+        )?;
         xml_writer.attribute("Target", "sharedStrings.xml")?;
         xml_writer.write_raw(b"/>")?;
 
         xml_writer.end_element("Relationships")?;
         xml_writer.flush()?;
-        
+
         Ok(())
     }
 
@@ -386,15 +419,15 @@ mod tests {
     fn test_fast_workbook() -> Result<()> {
         let dir = tempdir()?;
         let path = dir.path().join("test.xlsx");
-        
+
         let mut workbook = FastWorkbook::new(&path)?;
         workbook.add_worksheet("Sheet1")?;
-        
+
         workbook.write_row(&["Name", "Age"])?;
         workbook.write_row(&["Alice", "30"])?;
-        
+
         workbook.close()?;
-        
+
         assert!(path.exists());
         Ok(())
     }

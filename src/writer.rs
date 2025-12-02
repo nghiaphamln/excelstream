@@ -4,15 +4,15 @@
 //! Data is written directly to disk as you call write_row(), not kept in memory.
 
 use crate::error::Result;
-use crate::types::CellValue;
 use crate::fast_writer::FastWorkbook;
+use crate::types::CellValue;
 use std::path::Path;
 
 /// Excel file writer with TRUE streaming capabilities
 ///
-/// **V0.2.0 Breaking Change:** Now uses true streaming underneath. 
+/// **V0.2.0 Breaking Change:** Now uses true streaming underneath.
 /// Data is written directly to disk with constant memory usage.
-/// 
+///
 /// Writes Excel files row by row, streaming data directly to a ZIP file.
 /// Memory usage is constant (~80MB) regardless of dataset size.
 ///
@@ -22,12 +22,12 @@ use std::path::Path;
 /// use excelstream::writer::ExcelWriter;
 ///
 /// let mut writer = ExcelWriter::new("output.xlsx").unwrap();
-/// 
+///
 /// // Write millions of rows with constant memory usage
 /// for i in 0..1_000_000 {
 ///     writer.write_row(&["Name", "Age", "Email"]).unwrap();
 /// }
-/// 
+///
 /// writer.save().unwrap();
 /// ```
 pub struct ExcelWriter {
@@ -51,7 +51,7 @@ impl ExcelWriter {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
         let mut inner = FastWorkbook::new(path)?;
         inner.add_worksheet("Sheet1")?;
-        
+
         Ok(ExcelWriter {
             inner,
             current_sheet_name: "Sheet1".to_string(),
@@ -79,9 +79,7 @@ impl ExcelWriter {
         I: IntoIterator<Item = S>,
         S: AsRef<str>,
     {
-        let values: Vec<String> = data.into_iter()
-            .map(|s| s.as_ref().to_string())
-            .collect();
+        let values: Vec<String> = data.into_iter().map(|s| s.as_ref().to_string()).collect();
         let refs: Vec<&str> = values.iter().map(|s| s.as_str()).collect();
         self.inner.write_row(&refs)?;
         self.current_row += 1;
@@ -96,13 +94,13 @@ impl ExcelWriter {
     /// use excelstream::writer::ExcelWriter;
     ///
     /// let mut writer = ExcelWriter::new("output.xlsx").unwrap();
-    /// 
+    ///
     /// let rows = vec![
     ///     vec!["Alice", "30", "NYC"],
     ///     vec!["Bob", "25", "SF"],
     ///     vec!["Carol", "35", "LA"],
     /// ];
-    /// 
+    ///
     /// writer.write_rows_batch(&rows).unwrap();
     /// writer.save().unwrap();
     /// ```
@@ -145,7 +143,8 @@ impl ExcelWriter {
     /// writer.save().unwrap();
     /// ```
     pub fn write_row_typed(&mut self, cells: &[CellValue]) -> Result<()> {
-        let values: Vec<String> = cells.iter()
+        let values: Vec<String> = cells
+            .iter()
             .map(|cell| match cell {
                 CellValue::Empty => String::new(),
                 CellValue::String(s) => s.clone(),
@@ -154,6 +153,7 @@ impl ExcelWriter {
                 CellValue::Bool(b) => if *b { "TRUE" } else { "FALSE" }.to_string(),
                 CellValue::DateTime(d) => d.to_string(),
                 CellValue::Error(e) => format!("ERROR: {}", e),
+                CellValue::Formula(f) => f.clone(),
             })
             .collect();
         let refs: Vec<&str> = values.iter().map(|s| s.as_str()).collect();
@@ -196,10 +196,10 @@ impl ExcelWriter {
     ///
     /// let mut writer = ExcelWriter::new("output.xlsx").unwrap();
     /// writer.write_row(&["Data on Sheet1"]).unwrap();
-    /// 
+    ///
     /// writer.add_sheet("Sheet2").unwrap();
     /// writer.write_row(&["Data on Sheet2"]).unwrap();
-    /// 
+    ///
     /// writer.save().unwrap();
     /// ```
     pub fn add_sheet(&mut self, name: &str) -> Result<()> {
@@ -305,8 +305,10 @@ impl ExcelWriterBuilder {
     /// Build the writer
     pub fn build(self) -> Result<ExcelWriter> {
         let mut inner = FastWorkbook::new(&self.path)?;
-        
-        let sheet_name = self.default_sheet_name.unwrap_or_else(|| "Sheet1".to_string());
+
+        let sheet_name = self
+            .default_sheet_name
+            .unwrap_or_else(|| "Sheet1".to_string());
         inner.add_worksheet(&sheet_name)?;
 
         let mut writer = ExcelWriter {
@@ -322,7 +324,7 @@ impl ExcelWriterBuilder {
         if let Some(size) = self.max_buffer_size {
             writer.set_max_buffer_size(size);
         }
-        
+
         Ok(writer)
     }
 }
@@ -337,7 +339,7 @@ mod tests {
         let temp = NamedTempFile::new().unwrap();
         let writer = ExcelWriter::new(temp.path());
         assert!(writer.is_ok());
-        
+
         // Should be able to save immediately
         let writer = writer.unwrap();
         assert!(writer.save().is_ok());
@@ -347,11 +349,11 @@ mod tests {
     fn test_write_row() {
         let temp = NamedTempFile::new().unwrap();
         let mut writer = ExcelWriter::new(temp.path()).unwrap();
-        
-        assert!(writer.write_row(&["A", "B", "C"]).is_ok());
-        assert!(writer.write_row(&["1", "2", "3"]).is_ok());
+
+        assert!(writer.write_row(["A", "B", "C"]).is_ok());
+        assert!(writer.write_row(["1", "2", "3"]).is_ok());
         assert_eq!(writer.current_row(), 2);
-        
+
         assert!(writer.save().is_ok());
     }
 
@@ -359,18 +361,18 @@ mod tests {
     fn test_write_row_typed() {
         let temp = NamedTempFile::new().unwrap();
         let mut writer = ExcelWriter::new(temp.path()).unwrap();
-        
+
         use crate::types::CellValue;
         let row = vec![
             CellValue::String("Text".to_string()),
             CellValue::Int(42),
-            CellValue::Float(3.14),
+            CellValue::Float(1234.56),
             CellValue::Bool(true),
         ];
-        
+
         assert!(writer.write_row_typed(&row).is_ok());
         assert_eq!(writer.current_row(), 1);
-        
+
         assert!(writer.save().is_ok());
     }
 
@@ -382,7 +384,7 @@ mod tests {
             .with_flush_interval(500)
             .with_max_buffer_size(512 * 1024)
             .build();
-        
+
         assert!(writer.is_ok());
         let writer = writer.unwrap();
         assert_eq!(writer.current_sheet_name, "CustomSheet");
@@ -393,17 +395,17 @@ mod tests {
     fn test_add_sheet() {
         let temp = NamedTempFile::new().unwrap();
         let mut writer = ExcelWriter::new(temp.path()).unwrap();
-        
-        writer.write_row(&["Sheet1 Data"]).unwrap();
+
+        writer.write_row(["Sheet1 Data"]).unwrap();
         assert_eq!(writer.current_row(), 1);
-        
+
         writer.add_sheet("Sheet2").unwrap();
         assert_eq!(writer.current_row(), 0);
         assert_eq!(writer.current_sheet_name, "Sheet2");
-        
-        writer.write_row(&["Sheet2 Data"]).unwrap();
+
+        writer.write_row(["Sheet2 Data"]).unwrap();
         assert_eq!(writer.current_row(), 1);
-        
+
         assert!(writer.save().is_ok());
     }
 
@@ -411,10 +413,12 @@ mod tests {
     fn test_write_header() {
         let temp = NamedTempFile::new().unwrap();
         let mut writer = ExcelWriter::new(temp.path()).unwrap();
-        
-        writer.write_header(&["ID", "Name", "Email"]).unwrap();
-        writer.write_row(&["1", "Alice", "alice@example.com"]).unwrap();
-        
+
+        writer.write_header(["ID", "Name", "Email"]).unwrap();
+        writer
+            .write_row(["1", "Alice", "alice@example.com"])
+            .unwrap();
+
         assert_eq!(writer.current_row(), 2);
         assert!(writer.save().is_ok());
     }
@@ -423,16 +427,56 @@ mod tests {
     fn test_batch_write() {
         let temp = NamedTempFile::new().unwrap();
         let mut writer = ExcelWriter::new(temp.path()).unwrap();
-        
+
         let data = vec![
             vec!["A1", "B1", "C1"],
             vec!["A2", "B2", "C2"],
             vec!["A3", "B3", "C3"],
         ];
-        
+
         writer.write_rows_batch(&data).unwrap();
         assert_eq!(writer.current_row(), 3);
-        
+
+        assert!(writer.save().is_ok());
+    }
+
+    #[test]
+    fn test_formula_support() {
+        let temp = NamedTempFile::new().unwrap();
+        let mut writer = ExcelWriter::new(temp.path()).unwrap();
+
+        use crate::types::CellValue;
+
+        // Write header
+        writer.write_header(["Value 1", "Value 2", "Sum"]).unwrap();
+
+        // Write data with formula
+        writer
+            .write_row_typed(&[
+                CellValue::Int(10),
+                CellValue::Int(20),
+                CellValue::Formula("=A2+B2".to_string()),
+            ])
+            .unwrap();
+
+        writer
+            .write_row_typed(&[
+                CellValue::Int(15),
+                CellValue::Int(25),
+                CellValue::Formula("=A3+B3".to_string()),
+            ])
+            .unwrap();
+
+        // Add a summary row with SUM formula
+        writer
+            .write_row_typed(&[
+                CellValue::String("Total".to_string()),
+                CellValue::Empty,
+                CellValue::Formula("=SUM(C2:C3)".to_string()),
+            ])
+            .unwrap();
+
+        assert_eq!(writer.current_row(), 4);
         assert!(writer.save().is_ok());
     }
 }

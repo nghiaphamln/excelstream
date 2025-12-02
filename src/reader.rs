@@ -23,9 +23,9 @@ impl ExcelReader {
     /// let reader = ExcelReader::open("data.xlsx").unwrap();
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let workbook = open_workbook_auto(path)
-            .map_err(|e| ExcelError::ReadError(e.to_string()))?;
-        
+        let workbook =
+            open_workbook_auto(path).map_err(|e| ExcelError::ReadError(e.to_string()))?;
+
         Ok(ExcelReader { workbook })
     }
 
@@ -65,13 +65,18 @@ impl ExcelReader {
     /// }
     /// ```
     pub fn rows(&mut self, sheet_name: &str) -> Result<RowIterator> {
-        let range = self.workbook
-            .worksheet_range(sheet_name)
-            .map_err(|e| match e {
-                calamine::Error::Msg(ref msg) if msg.contains("not found") => 
-                    ExcelError::SheetNotFound(sheet_name.to_string()),
-                _ => ExcelError::from(e)
-            })?;
+        let range = self.workbook.worksheet_range(sheet_name).map_err(|e| {
+            let error_str = e.to_string();
+            if error_str.contains("not found") {
+                let available = self.sheet_names().join(", ");
+                ExcelError::SheetNotFound {
+                    sheet: sheet_name.to_string(),
+                    available,
+                }
+            } else {
+                ExcelError::from(e)
+            }
+        })?;
 
         Ok(RowIterator::new(range))
     }
@@ -79,10 +84,14 @@ impl ExcelReader {
     /// Read all rows from a sheet by index (0-based)
     pub fn rows_by_index(&mut self, index: usize) -> Result<RowIterator> {
         let sheet_names = self.sheet_names();
-        let sheet_name = sheet_names
-            .get(index)
-            .ok_or_else(|| ExcelError::SheetNotFound(format!("Sheet index {}", index)))?;
-        
+        let sheet_name = sheet_names.get(index).ok_or_else(|| {
+            let available = sheet_names.join(", ");
+            ExcelError::SheetNotFound {
+                sheet: format!("index {}", index),
+                available,
+            }
+        })?;
+
         self.rows(sheet_name)
     }
 
@@ -98,15 +107,21 @@ impl ExcelReader {
     /// println!("Cell A1: {}", value);
     /// ```
     pub fn read_cell(&mut self, sheet_name: &str, row: u32, col: u32) -> Result<CellValue> {
-        let range = self.workbook
-            .worksheet_range(sheet_name)
-            .map_err(|e| match e {
-                calamine::Error::Msg(ref msg) if msg.contains("not found") => 
-                    ExcelError::SheetNotFound(sheet_name.to_string()),
-                _ => ExcelError::from(e)
-            })?;
+        let range = self.workbook.worksheet_range(sheet_name).map_err(|e| {
+            let error_str = e.to_string();
+            if error_str.contains("not found") {
+                let available = self.sheet_names().join(", ");
+                ExcelError::SheetNotFound {
+                    sheet: sheet_name.to_string(),
+                    available,
+                }
+            } else {
+                ExcelError::from(e)
+            }
+        })?;
 
-        let cell = range.get_value((row, col))
+        let cell = range
+            .get_value((row, col))
             .map(datatype_to_cellvalue)
             .unwrap_or(CellValue::Empty);
 
@@ -115,13 +130,18 @@ impl ExcelReader {
 
     /// Get the dimensions of a sheet (rows, cols)
     pub fn dimensions(&mut self, sheet_name: &str) -> Result<(u32, u32)> {
-        let range = self.workbook
-            .worksheet_range(sheet_name)
-            .map_err(|e| match e {
-                calamine::Error::Msg(ref msg) if msg.contains("not found") => 
-                    ExcelError::SheetNotFound(sheet_name.to_string()),
-                _ => ExcelError::from(e)
-            })?;
+        let range = self.workbook.worksheet_range(sheet_name).map_err(|e| {
+            let error_str = e.to_string();
+            if error_str.contains("not found") {
+                let available = self.sheet_names().join(", ");
+                ExcelError::SheetNotFound {
+                    sheet: sheet_name.to_string(),
+                    available,
+                }
+            } else {
+                ExcelError::from(e)
+            }
+        })?;
 
         let (rows, cols) = range.get_size();
         Ok((rows as u32, cols as u32))
@@ -138,8 +158,8 @@ pub struct RowIterator {
 impl RowIterator {
     fn new(range: Range<Data>) -> Self {
         let (rows, _) = range.get_size();
-        let start = range.start().map(|(r, _)| r as u32).unwrap_or(0);
-        
+        let start = range.start().map(|(r, _)| r).unwrap_or(0);
+
         RowIterator {
             range,
             current_row: start,
@@ -163,11 +183,12 @@ impl Iterator for RowIterator {
         let mut cells = Vec::with_capacity(cols);
 
         for col in 0..cols {
-            let cell_value = self.range
+            let cell_value = self
+                .range
                 .get_value((row_idx, col as u32))
                 .map(datatype_to_cellvalue)
                 .unwrap_or(CellValue::Empty);
-            
+
             cells.push(cell_value);
         }
 

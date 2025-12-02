@@ -19,6 +19,9 @@ pub enum CellValue {
     DateTime(f64),
     /// Error value
     Error(String),
+    /// Formula value (e.g., "=SUM(A1:A10)")
+    /// The formula should start with '=' and use Excel formula syntax
+    Formula(String),
 }
 
 impl CellValue {
@@ -32,6 +35,7 @@ impl CellValue {
             CellValue::Bool(b) => b.to_string(),
             CellValue::DateTime(d) => d.to_string(),
             CellValue::Error(e) => format!("ERROR: {}", e),
+            CellValue::Formula(f) => f.clone(),
         }
     }
 
@@ -138,13 +142,13 @@ impl Cell {
     fn col_to_letter(col: u32) -> String {
         let mut result = String::new();
         let mut col = col + 1;
-        
+
         while col > 0 {
             col -= 1;
             result.insert(0, (b'A' + (col % 26) as u8) as char);
             col /= 26;
         }
-        
+
         result
     }
 }

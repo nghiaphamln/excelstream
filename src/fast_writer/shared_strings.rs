@@ -1,9 +1,9 @@
 //! Shared strings table for string deduplication
 
+use super::xml_writer::XmlWriter;
+use crate::error::Result;
 use std::collections::HashMap;
 use std::io::Write;
-use crate::error::Result;
-use super::xml_writer::XmlWriter;
 
 /// Shared strings table that deduplicates strings across the workbook
 pub struct SharedStrings {
@@ -59,10 +59,13 @@ impl SharedStrings {
     pub fn write_xml<W: Write>(&self, writer: &mut XmlWriter<W>) -> Result<()> {
         // XML declaration
         writer.write_str("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")?;
-        
+
         // Start sst element
         writer.start_element("sst")?;
-        writer.attribute("xmlns", "http://schemas.openxmlformats.org/spreadsheetml/2006/main")?;
+        writer.attribute(
+            "xmlns",
+            "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+        )?;
         writer.attribute_int("count", self.strings.len() as i64)?;
         writer.attribute_int("uniqueCount", self.strings.len() as i64)?;
         writer.close_start_tag()?;
@@ -71,12 +74,12 @@ impl SharedStrings {
         for s in &self.strings {
             writer.start_element("si")?;
             writer.close_start_tag()?;
-            
+
             writer.start_element("t")?;
             writer.close_start_tag()?;
             writer.write_escaped(s)?;
             writer.end_element("t")?;
-            
+
             writer.end_element("si")?;
         }
 
@@ -99,11 +102,11 @@ mod tests {
     #[test]
     fn test_shared_strings() {
         let mut ss = SharedStrings::new();
-        
+
         let idx1 = ss.add_string("Hello");
         let idx2 = ss.add_string("World");
         let idx3 = ss.add_string("Hello"); // Duplicate
-        
+
         assert_eq!(idx1, 0);
         assert_eq!(idx2, 1);
         assert_eq!(idx3, 0); // Should return same index

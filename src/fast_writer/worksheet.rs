@@ -1,9 +1,9 @@
 //! Fast worksheet implementation with optimized row writing
 
-use std::io::Write;
-use crate::error::Result;
-use super::xml_writer::XmlWriter;
 use super::shared_strings::SharedStrings;
+use super::xml_writer::XmlWriter;
+use crate::error::Result;
+use std::io::Write;
 
 /// Cell reference generator
 struct CellRef {
@@ -49,16 +49,22 @@ pub struct FastWorksheet<W: Write> {
 impl<W: Write> FastWorksheet<W> {
     pub fn new(writer: W, shared_strings: SharedStrings) -> Result<Self> {
         let mut xml_writer = XmlWriter::new(writer);
-        
+
         // Write XML header
         xml_writer.write_str("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")?;
-        
+
         // Start worksheet
         xml_writer.start_element("worksheet")?;
-        xml_writer.attribute("xmlns", "http://schemas.openxmlformats.org/spreadsheetml/2006/main")?;
-        xml_writer.attribute("xmlns:r", "http://schemas.openxmlformats.org/officeDocument/2006/relationships")?;
+        xml_writer.attribute(
+            "xmlns",
+            "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+        )?;
+        xml_writer.attribute(
+            "xmlns:r",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        )?;
         xml_writer.close_start_tag()?;
-        
+
         // Start sheetData
         xml_writer.start_element("sheetData")?;
         xml_writer.close_start_tag()?;
@@ -107,7 +113,7 @@ impl<W: Write> FastWorksheet<W> {
     /// Write a row of typed data
     pub fn write_row_typed(&mut self, values: &[crate::types::CellValue]) -> Result<()> {
         use crate::types::CellValue;
-        
+
         self.cell_ref.next_row();
         self.row_count += 1;
 
@@ -119,48 +125,48 @@ impl<W: Write> FastWorksheet<W> {
         // Write cells
         for value in values {
             let cell_ref = self.cell_ref.next_cell();
-            
+
             match value {
                 CellValue::Empty => {
                     // Skip empty cells
                 }
                 CellValue::String(s) => {
                     let string_index = self.shared_strings.add_string(s);
-                    
+
                     self.xml_writer.start_element("c")?;
                     self.xml_writer.attribute("r", &cell_ref)?;
                     self.xml_writer.attribute("t", "s")?;
                     self.xml_writer.close_start_tag()?;
-                    
+
                     self.xml_writer.start_element("v")?;
                     self.xml_writer.close_start_tag()?;
                     self.xml_writer.write_str(&string_index.to_string())?;
                     self.xml_writer.end_element("v")?;
-                    
+
                     self.xml_writer.end_element("c")?;
                 }
                 CellValue::Int(n) => {
                     self.xml_writer.start_element("c")?;
                     self.xml_writer.attribute("r", &cell_ref)?;
                     self.xml_writer.close_start_tag()?;
-                    
+
                     self.xml_writer.start_element("v")?;
                     self.xml_writer.close_start_tag()?;
                     self.xml_writer.write_str(&n.to_string())?;
                     self.xml_writer.end_element("v")?;
-                    
+
                     self.xml_writer.end_element("c")?;
                 }
                 CellValue::Float(f) => {
                     self.xml_writer.start_element("c")?;
                     self.xml_writer.attribute("r", &cell_ref)?;
                     self.xml_writer.close_start_tag()?;
-                    
+
                     self.xml_writer.start_element("v")?;
                     self.xml_writer.close_start_tag()?;
                     self.xml_writer.write_str(&f.to_string())?;
                     self.xml_writer.end_element("v")?;
-                    
+
                     self.xml_writer.end_element("c")?;
                 }
                 CellValue::Bool(b) => {
@@ -168,29 +174,29 @@ impl<W: Write> FastWorksheet<W> {
                     self.xml_writer.attribute("r", &cell_ref)?;
                     self.xml_writer.attribute("t", "b")?;
                     self.xml_writer.close_start_tag()?;
-                    
+
                     self.xml_writer.start_element("v")?;
                     self.xml_writer.close_start_tag()?;
                     self.xml_writer.write_str(if *b { "1" } else { "0" })?;
                     self.xml_writer.end_element("v")?;
-                    
+
                     self.xml_writer.end_element("c")?;
                 }
                 _ => {
                     // For DateTime and Error, convert to string for now
                     let s = format!("{:?}", value);
                     let string_index = self.shared_strings.add_string(&s);
-                    
+
                     self.xml_writer.start_element("c")?;
                     self.xml_writer.attribute("r", &cell_ref)?;
                     self.xml_writer.attribute("t", "s")?;
                     self.xml_writer.close_start_tag()?;
-                    
+
                     self.xml_writer.start_element("v")?;
                     self.xml_writer.close_start_tag()?;
                     self.xml_writer.write_str(&string_index.to_string())?;
                     self.xml_writer.end_element("v")?;
-                    
+
                     self.xml_writer.end_element("c")?;
                 }
             }
@@ -205,10 +211,10 @@ impl<W: Write> FastWorksheet<W> {
     pub fn finish(mut self) -> Result<SharedStrings> {
         // End sheetData
         self.xml_writer.end_element("sheetData")?;
-        
+
         // End worksheet
         self.xml_writer.end_element("worksheet")?;
-        
+
         self.xml_writer.flush()?;
         Ok(self.shared_strings)
     }
@@ -224,7 +230,7 @@ mod tests {
 
     #[test]
     fn test_cell_ref() {
-        let mut cell_ref = CellRef::new();
+        let cell_ref = CellRef::new();
         assert_eq!(cell_ref.to_cell_ref(1, 1), "A1");
         assert_eq!(cell_ref.to_cell_ref(1, 26), "Z1");
         assert_eq!(cell_ref.to_cell_ref(1, 27), "AA1");
@@ -236,12 +242,12 @@ mod tests {
         let mut output = Vec::new();
         let ss = SharedStrings::new();
         let mut ws = FastWorksheet::new(&mut output, ss).unwrap();
-        
+
         ws.write_row(&["Name", "Age"]).unwrap();
         ws.write_row(&["Alice", "30"]).unwrap();
-        
+
         let ss = ws.finish().unwrap();
-        
+
         let xml = String::from_utf8(output).unwrap();
         assert!(xml.contains("<row r=\"1\">"));
         assert!(xml.contains("<row r=\"2\">"));

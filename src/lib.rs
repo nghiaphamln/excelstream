@@ -1,4 +1,4 @@
-//! # rust-excelize
+//! # excelstream
 //!
 //! A high-performance Rust library for streaming Excel import/export operations.
 //!
@@ -19,7 +19,7 @@
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let mut reader = ExcelReader::open("data.xlsx")?;
-//! 
+//!
 //! for row_result in reader.rows("Sheet1")? {
 //!     let row = row_result?;
 //!     println!("Row: {:?}", row);
@@ -35,26 +35,26 @@
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let mut writer = ExcelWriter::new("output.xlsx")?;
-//! 
+//!
 //! writer.write_row(&["Name", "Age", "City"])?;
 //! writer.write_row(&["Alice", "30", "New York"])?;
 //! writer.write_row(&["Bob", "25", "San Francisco"])?;
-//! 
+//!
 //! writer.save()?;
 //! # Ok(())
 //! # }
 //! ```
 
 pub mod error;
-pub mod reader;
-pub mod writer;
-pub mod types;
 pub mod fast_writer;
+pub mod reader;
+pub mod types;
+pub mod writer;
 
 pub use error::{ExcelError, Result};
 pub use reader::ExcelReader;
-pub use writer::ExcelWriter;
 pub use types::{Cell, CellValue, Row};
+pub use writer::ExcelWriter;
 
 #[cfg(test)]
 mod tests {

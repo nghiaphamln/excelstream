@@ -17,8 +17,17 @@ pub enum ExcelError {
     WriteError(String),
 
     /// Invalid sheet name or sheet not found
-    #[error("Sheet not found: {0}")]
-    SheetNotFound(String),
+    #[error("Sheet '{sheet}' not found. Available sheets: {available}")]
+    SheetNotFound { sheet: String, available: String },
+
+    /// Error occurred while writing a row
+    #[error("Failed to write row {row} to sheet '{sheet}': {source}")]
+    WriteRowError {
+        row: u32,
+        sheet: String,
+        #[source]
+        source: Box<ExcelError>,
+    },
 
     /// Invalid cell reference
     #[error("Invalid cell reference: {0}")]
@@ -31,10 +40,6 @@ pub enum ExcelError {
     /// Calamine error wrapper
     #[error("Calamine error: {0}")]
     CaliamineError(String),
-
-    /// XlsxWriter error wrapper
-    #[error("XlsxWriter error: {0}")]
-    XlsxWriterError(String),
 
     /// Invalid format
     #[error("Invalid format: {0}")]
