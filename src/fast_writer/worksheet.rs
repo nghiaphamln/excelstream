@@ -112,6 +112,19 @@ impl<W: Write> FastWorksheet<W> {
 
     /// Write a row of typed data
     pub fn write_row_typed(&mut self, values: &[crate::types::CellValue]) -> Result<()> {
+        use crate::types::{CellStyle, StyledCell};
+
+        // Convert to styled cells with default style
+        let styled_cells: Vec<StyledCell> = values
+            .iter()
+            .map(|v| StyledCell::new(v.clone(), CellStyle::Default))
+            .collect();
+
+        self.write_row_styled(&styled_cells)
+    }
+
+    /// Write a row of styled cells
+    pub fn write_row_styled(&mut self, cells: &[crate::types::StyledCell]) -> Result<()> {
         use crate::types::CellValue;
 
         self.cell_ref.next_row();
@@ -123,10 +136,11 @@ impl<W: Write> FastWorksheet<W> {
         self.xml_writer.close_start_tag()?;
 
         // Write cells
-        for value in values {
+        for cell in cells {
             let cell_ref = self.cell_ref.next_cell();
+            let style_index = cell.style.index();
 
-            match value {
+            match &cell.value {
                 CellValue::Empty => {
                     // Skip empty cells
                 }
@@ -135,6 +149,9 @@ impl<W: Write> FastWorksheet<W> {
 
                     self.xml_writer.start_element("c")?;
                     self.xml_writer.attribute("r", &cell_ref)?;
+                    if style_index > 0 {
+                        self.xml_writer.attribute_int("s", style_index as i64)?;
+                    }
                     self.xml_writer.attribute("t", "s")?;
                     self.xml_writer.close_start_tag()?;
 
@@ -148,6 +165,9 @@ impl<W: Write> FastWorksheet<W> {
                 CellValue::Int(n) => {
                     self.xml_writer.start_element("c")?;
                     self.xml_writer.attribute("r", &cell_ref)?;
+                    if style_index > 0 {
+                        self.xml_writer.attribute_int("s", style_index as i64)?;
+                    }
                     self.xml_writer.close_start_tag()?;
 
                     self.xml_writer.start_element("v")?;
@@ -160,6 +180,9 @@ impl<W: Write> FastWorksheet<W> {
                 CellValue::Float(f) => {
                     self.xml_writer.start_element("c")?;
                     self.xml_writer.attribute("r", &cell_ref)?;
+                    if style_index > 0 {
+                        self.xml_writer.attribute_int("s", style_index as i64)?;
+                    }
                     self.xml_writer.close_start_tag()?;
 
                     self.xml_writer.start_element("v")?;
@@ -172,6 +195,9 @@ impl<W: Write> FastWorksheet<W> {
                 CellValue::Bool(b) => {
                     self.xml_writer.start_element("c")?;
                     self.xml_writer.attribute("r", &cell_ref)?;
+                    if style_index > 0 {
+                        self.xml_writer.attribute_int("s", style_index as i64)?;
+                    }
                     self.xml_writer.attribute("t", "b")?;
                     self.xml_writer.close_start_tag()?;
 
@@ -182,13 +208,32 @@ impl<W: Write> FastWorksheet<W> {
 
                     self.xml_writer.end_element("c")?;
                 }
-                _ => {
-                    // For DateTime and Error, convert to string for now
-                    let s = format!("{:?}", value);
+                CellValue::Formula(formula) => {
+                    self.xml_writer.start_element("c")?;
+                    self.xml_writer.attribute("r", &cell_ref)?;
+                    if style_index > 0 {
+                        self.xml_writer.attribute_int("s", style_index as i64)?;
+                    }
+                    self.xml_writer.close_start_tag()?;
+
+                    // Write formula
+                    self.xml_writer.start_element("f")?;
+                    self.xml_writer.close_start_tag()?;
+                    self.xml_writer.write_str(formula)?;
+                    self.xml_writer.end_element("f")?;
+
+                    self.xml_writer.end_element("c")?;
+                }
+                CellValue::DateTime(_) | CellValue::Error(_) => {
+                    // For DateTime and Error, convert to string
+                    let s = format!("{:?}", cell.value);
                     let string_index = self.shared_strings.add_string(&s);
 
                     self.xml_writer.start_element("c")?;
                     self.xml_writer.attribute("r", &cell_ref)?;
+                    if style_index > 0 {
+                        self.xml_writer.attribute_int("s", style_index as i64)?;
+                    }
                     self.xml_writer.attribute("t", "s")?;
                     self.xml_writer.close_start_tag()?;
 

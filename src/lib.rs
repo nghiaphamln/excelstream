@@ -70,7 +70,7 @@ pub mod writer;
 
 pub use error::{ExcelError, Result};
 pub use reader::ExcelReader;
-pub use types::{Cell, CellValue, Row};
+pub use types::{Cell, CellStyle, CellValue, Row, StyledCell};
 pub use writer::ExcelWriter;
 
 #[cfg(test)]

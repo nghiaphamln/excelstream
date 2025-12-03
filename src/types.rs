@@ -2,6 +2,76 @@
 
 use std::fmt;
 
+/// Cell style presets for formatting
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CellStyle {
+    /// Default style - no formatting
+    Default = 0,
+    /// Bold text for headers
+    HeaderBold = 1,
+    /// Integer format with thousand separator (#,##0)
+    NumberInteger = 2,
+    /// Decimal format with 2 places (#,##0.00)
+    NumberDecimal = 3,
+    /// Currency format ($#,##0.00)
+    NumberCurrency = 4,
+    /// Percentage format (0.00%)
+    NumberPercentage = 5,
+    /// Date format (MM/DD/YYYY)
+    DateDefault = 6,
+    /// DateTime format (MM/DD/YYYY HH:MM:SS)
+    DateTimestamp = 7,
+    /// Bold text for emphasis
+    TextBold = 8,
+    /// Italic text for notes
+    TextItalic = 9,
+    /// Yellow background highlight
+    HighlightYellow = 10,
+    /// Green background highlight
+    HighlightGreen = 11,
+    /// Red background highlight
+    HighlightRed = 12,
+    /// Thin borders on all sides
+    BorderThin = 13,
+}
+
+impl CellStyle {
+    /// Get the style index for XML
+    pub fn index(&self) -> u32 {
+        *self as u32
+    }
+}
+
+/// Styled cell value (combines value with formatting)
+#[derive(Debug, Clone)]
+pub struct StyledCell {
+    /// The cell value
+    pub value: CellValue,
+    /// The cell style
+    pub style: CellStyle,
+}
+
+impl StyledCell {
+    /// Create a new styled cell
+    pub fn new(value: CellValue, style: CellStyle) -> Self {
+        StyledCell { value, style }
+    }
+
+    /// Create a cell with default style
+    pub fn default_style(value: CellValue) -> Self {
+        StyledCell {
+            value,
+            style: CellStyle::Default,
+        }
+    }
+}
+
+impl From<CellValue> for StyledCell {
+    fn from(value: CellValue) -> Self {
+        StyledCell::default_style(value)
+    }
+}
+
 /// Represents a single cell value in an Excel worksheet
 #[derive(Debug, Clone, PartialEq)]
 pub enum CellValue {

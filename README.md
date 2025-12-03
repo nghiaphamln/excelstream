@@ -6,18 +6,19 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/KSD-CO/excelstream/workflows/Rust/badge.svg)](https://github.com/KSD-CO/excelstream/actions)
 
-> **✨ What's New in v0.2.2:**
-> - ✅ **Formula Support** - Write Excel formulas like `=SUM(A1:A10)`
-> - ✅ **Better Error Messages** - Context-rich errors with sheet information
-> - ✅ **21-47% Faster** - Optimized performance vs rust_xlsxwriter
-> - ✅ **Comprehensive Tests** - 47 tests covering edge cases, unicode, special characters
-> - ✅ **CI/CD Pipeline** - Automated testing and publishing
+> **✨ What's New in v0.3.0:**
+> - ✨ **Cell Formatting** - 14 predefined styles: bold, italic, highlights, borders, number formats!
+> - 🎨 **Easy Styling API** - `write_header_bold()`, `write_row_styled()`, `write_row_with_style()`
+> - 💰 **Number Formats** - Currency, percentage, decimal, integer formats
+> - 🎨 **Text Styles** - Bold, italic, yellow/green/red highlights
+> - 📅 **Date Formats** - MM/DD/YYYY and timestamp formats
 
 ## ✨ Features
 
 - 🚀 **Streaming Read** - Process large Excel files without loading entire file into memory
 - 💾 **Streaming Write** - Write millions of rows with constant ~80MB memory usage
 - ⚡ **High Performance** - 21-47% faster than rust_xlsxwriter baseline
+- 🎨 **Cell Formatting** - 14 predefined styles (bold, currency, %, highlights, borders)
 - 📐 **Formula Support** - Write Excel formulas (=SUM, =AVERAGE, =IF, etc.)
 - 🎯 **Typed Values** - Strong typing with Int, Float, Bool, DateTime, Formula
 - 🔧 **Memory Efficient** - Configurable flush intervals for memory-limited environments
@@ -26,7 +27,7 @@
 - 🔒 **Type-safe** - Leverage Rust's type system for safety
 - 📝 **Multi-sheet** - Support multiple sheets in one workbook
 - 🗄️ **Database Export** - PostgreSQL integration examples
-- ✅ **Production Ready** - 47 tests, CI/CD, zero unsafe code
+- ✅ **Production Ready** - 47+ tests, CI/CD, zero unsafe code
 
 ## 📦 Installation
 
@@ -178,6 +179,140 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 - ✅ Cell ranges: `=SUM(A1:A10)`
 - ✅ Complex formulas: `=IF(A1>100, "High", "Low")`
 - ✅ All standard Excel functions
+
+### Cell Formatting and Styling
+
+**New in v0.3.0:** Apply 14 predefined cell styles including bold headers, number formats, highlights, and borders!
+
+#### Bold Headers
+
+```rust
+use excelstream::writer::ExcelWriter;
+
+let mut writer = ExcelWriter::new("report.xlsx")?;
+
+// Write bold header
+writer.write_header_bold(&["Name", "Amount", "Status"])?;
+
+// Regular data rows
+writer.write_row(&["Alice", "1,234.56", "Active"])?;
+writer.write_row(&["Bob", "2,345.67", "Pending"])?;
+
+writer.save()?;
+```
+
+#### Styled Cells
+
+Apply different styles to individual cells:
+
+```rust
+use excelstream::types::{CellValue, CellStyle};
+use excelstream::writer::ExcelWriter;
+
+let mut writer = ExcelWriter::new("report.xlsx")?;
+
+writer.write_header_bold(&["Item", "Amount", "Change %"])?;
+
+// Mix different styles in one row
+writer.write_row_styled(&[
+    (CellValue::String("Revenue".to_string()), CellStyle::TextBold),
+    (CellValue::Float(150000.00), CellStyle::NumberCurrency),
+    (CellValue::Float(0.15), CellStyle::NumberPercentage),
+])?;
+
+writer.write_row_styled(&[
+    (CellValue::String("Profit".to_string()), CellStyle::HighlightGreen),
+    (CellValue::Float(55000.00), CellStyle::NumberCurrency),
+    (CellValue::Float(0.22), CellStyle::NumberPercentage),
+])?;
+
+writer.save()?;
+```
+
+#### Uniform Row Styling
+
+Apply the same style to all cells in a row:
+
+```rust
+// All cells bold
+writer.write_row_with_style(&[
+    CellValue::String("IMPORTANT".to_string()),
+    CellValue::String("READ THIS".to_string()),
+    CellValue::String("URGENT".to_string()),
+], CellStyle::TextBold)?;
+
+// All cells highlighted yellow
+writer.write_row_with_style(&[
+    CellValue::String("Warning".to_string()),
+    CellValue::String("Check values".to_string()),
+    CellValue::String("Need review".to_string()),
+], CellStyle::HighlightYellow)?;
+```
+
+#### Available Cell Styles
+
+| Style | Format Code | Example | Use Case |
+|-------|------------|---------|----------|
+| `CellStyle::Default` | None | Plain text | Regular data |
+| `CellStyle::HeaderBold` | Bold | **Header** | Column headers |
+| `CellStyle::NumberInteger` | #,##0 | 1,234 | Whole numbers |
+| `CellStyle::NumberDecimal` | #,##0.00 | 1,234.56 | Decimals |
+| `CellStyle::NumberCurrency` | $#,##0.00 | $1,234.56 | Money amounts |
+| `CellStyle::NumberPercentage` | 0.00% | 95.00% | Percentages |
+| `CellStyle::DateDefault` | MM/DD/YYYY | 01/15/2024 | Dates |
+| `CellStyle::DateTimestamp` | MM/DD/YYYY HH:MM:SS | 01/15/2024 14:30:00 | Timestamps |
+| `CellStyle::TextBold` | Bold | **Bold text** | Emphasis |
+| `CellStyle::TextItalic` | Italic | *Italic text* | Notes |
+| `CellStyle::HighlightYellow` | Yellow bg | 🟨 Text | Warnings |
+| `CellStyle::HighlightGreen` | Green bg | 🟩 Text | Success |
+| `CellStyle::HighlightRed` | Red bg | 🟥 Text | Errors |
+| `CellStyle::BorderThin` | Thin borders | ▭ Text | Boundaries |
+
+#### Complete Example
+
+```rust
+use excelstream::writer::ExcelWriter;
+use excelstream::types::{CellValue, CellStyle};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut writer = ExcelWriter::new("quarterly_report.xlsx")?;
+
+    // Bold header
+    writer.write_header_bold(&["Quarter", "Revenue", "Expenses", "Profit", "Margin %"])?;
+
+    // Q1 - Green highlight for good performance
+    writer.write_row_styled(&[
+        (CellValue::String("Q1 2024".to_string()), CellStyle::Default),
+        (CellValue::Float(500000.00), CellStyle::NumberCurrency),
+        (CellValue::Float(320000.00), CellStyle::NumberCurrency),
+        (CellValue::Float(180000.00), CellStyle::NumberCurrency),
+        (CellValue::Float(0.36), CellStyle::NumberPercentage),
+    ])?;
+
+    // Q2 - Yellow highlight for warning
+    writer.write_row_styled(&[
+        (CellValue::String("Q2 2024".to_string()), CellStyle::Default),
+        (CellValue::Float(450000.00), CellStyle::NumberCurrency),
+        (CellValue::Float(380000.00), CellStyle::NumberCurrency),
+        (CellValue::Float(70000.00), CellStyle::HighlightYellow),
+        (CellValue::Float(0.16), CellStyle::NumberPercentage),
+    ])?;
+
+    // Total row with formulas and bold
+    writer.write_row_styled(&[
+        (CellValue::String("Total".to_string()), CellStyle::TextBold),
+        (CellValue::Formula("=SUM(B2:B3)".to_string()), CellStyle::NumberCurrency),
+        (CellValue::Formula("=SUM(C2:C3)".to_string()), CellStyle::NumberCurrency),
+        (CellValue::Formula("=SUM(D2:D3)".to_string()), CellStyle::NumberCurrency),
+        (CellValue::Formula("=AVERAGE(E2:E3)".to_string()), CellStyle::NumberPercentage),
+    ])?;
+
+    writer.save()?;
+    Ok(())
+}
+```
+
+**See also:** Run `cargo run --example cell_formatting` to see all 14 styles in action!
 
 ### Direct FastWorkbook Usage (Maximum Performance)
 

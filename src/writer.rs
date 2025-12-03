@@ -5,7 +5,7 @@
 
 use crate::error::Result;
 use crate::fast_writer::FastWorkbook;
-use crate::types::CellValue;
+use crate::types::{CellStyle, CellValue};
 use std::path::Path;
 
 /// Excel file writer with TRUE streaming capabilities
@@ -162,10 +162,90 @@ impl ExcelWriter {
         Ok(())
     }
 
-    /// Write header row
+    /// Write a row with styled cells
     ///
-    /// Note: In v0.2.0, bold formatting is not yet supported in streaming mode.
-    /// This writes a regular row. Formatting support will be added in future versions.
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use excelstream::writer::ExcelWriter;
+    /// use excelstream::types::{CellValue, CellStyle};
+    ///
+    /// let mut writer = ExcelWriter::new("output.xlsx").unwrap();
+    /// writer.write_row_styled(&[
+    ///     (CellValue::String("Total".to_string()), CellStyle::HeaderBold),
+    ///     (CellValue::Float(1234.56), CellStyle::NumberCurrency),
+    ///     (CellValue::Int(95), CellStyle::NumberPercentage),
+    /// ]).unwrap();
+    /// writer.save().unwrap();
+    /// ```
+    pub fn write_row_styled(&mut self, cells: &[(CellValue, CellStyle)]) -> Result<()> {
+        use crate::types::StyledCell;
+
+        let styled_cells: Vec<StyledCell> = cells
+            .iter()
+            .map(|(value, style)| StyledCell::new(value.clone(), *style))
+            .collect();
+
+        self.inner.write_row_styled(&styled_cells)?;
+        self.current_row += 1;
+        Ok(())
+    }
+
+    /// Write a row with all cells using the same style
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use excelstream::writer::ExcelWriter;
+    /// use excelstream::types::{CellValue, CellStyle};
+    ///
+    /// let mut writer = ExcelWriter::new("output.xlsx").unwrap();
+    /// writer.write_row_with_style(&[
+    ///     CellValue::Int(100),
+    ///     CellValue::Int(200),
+    ///     CellValue::Int(300),
+    /// ], CellStyle::NumberInteger).unwrap();
+    /// writer.save().unwrap();
+    /// ```
+    pub fn write_row_with_style(&mut self, values: &[CellValue], style: CellStyle) -> Result<()> {
+        let cells: Vec<_> = values.iter().map(|v| (v.clone(), style)).collect();
+        self.write_row_styled(&cells)
+    }
+
+    /// Write header row with bold formatting
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use excelstream::writer::ExcelWriter;
+    ///
+    /// let mut writer = ExcelWriter::new("output.xlsx").unwrap();
+    /// writer.write_header_bold(&["ID", "Name", "Email"]).unwrap();
+    /// writer.write_row(&["1", "Alice", "alice@example.com"]).unwrap();
+    /// writer.save().unwrap();
+    /// ```
+    pub fn write_header_bold<I, S>(&mut self, headers: I) -> Result<()>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        use crate::types::CellStyle;
+
+        let cells: Vec<_> = headers
+            .into_iter()
+            .map(|h| {
+                (
+                    CellValue::String(h.as_ref().to_string()),
+                    CellStyle::HeaderBold,
+                )
+            })
+            .collect();
+        self.write_row_styled(&cells)
+    }
+
+    /// Write header row (without bold - for backward compatibility)
+    ///
+    /// **Note:** For bold headers, use `write_header_bold()` instead.
     ///
     /// # Examples
     ///
@@ -182,8 +262,6 @@ impl ExcelWriter {
         I: IntoIterator<Item = S>,
         S: AsRef<str>,
     {
-        // TODO: Add bold formatting support in FastWorkbook
-        // For now, just write as regular row
         self.write_row(headers)
     }
 

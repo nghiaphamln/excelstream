@@ -176,6 +176,160 @@ impl FastWorkbook {
         Ok(())
     }
 
+    /// Write a row of styled cells to the current worksheet
+    pub fn write_row_styled(&mut self, cells: &[crate::types::StyledCell]) -> Result<()> {
+        use crate::types::CellValue;
+
+        if self.current_worksheet.is_none() {
+            return Err(crate::error::ExcelError::WriteError(
+                "No active worksheet".to_string(),
+            ));
+        }
+
+        self.current_row += 1;
+        let row_num = self.current_row;
+
+        // Build XML in buffer
+        self.xml_buffer.clear();
+        self.xml_buffer.extend_from_slice(b"<row r=\"");
+        self.xml_buffer
+            .extend_from_slice(row_num.to_string().as_bytes());
+        self.xml_buffer.extend_from_slice(b"\">");
+
+        for (col_idx, cell) in cells.iter().enumerate() {
+            let col_num = (col_idx + 1) as u32;
+            let style_index = cell.style.index();
+
+            // Get column letter
+            let col_letter = if col_num <= self.cell_ref_cache.len() as u32 {
+                &self.cell_ref_cache[col_idx]
+            } else {
+                &Self::col_to_letter(col_num)
+            };
+
+            match &cell.value {
+                CellValue::Empty => {
+                    // Skip empty cells
+                    continue;
+                }
+                CellValue::String(s) => {
+                    let string_index = self.shared_strings.add_string(s);
+                    self.xml_buffer.extend_from_slice(b"<c r=\"");
+                    self.xml_buffer.extend_from_slice(col_letter.as_bytes());
+                    self.xml_buffer
+                        .extend_from_slice(row_num.to_string().as_bytes());
+                    self.xml_buffer.extend_from_slice(b"\"");
+                    if style_index > 0 {
+                        self.xml_buffer.extend_from_slice(b" s=\"");
+                        self.xml_buffer
+                            .extend_from_slice(style_index.to_string().as_bytes());
+                        self.xml_buffer.extend_from_slice(b"\"");
+                    }
+                    self.xml_buffer.extend_from_slice(b" t=\"s\"><v>");
+                    self.xml_buffer
+                        .extend_from_slice(string_index.to_string().as_bytes());
+                    self.xml_buffer.extend_from_slice(b"</v></c>");
+                }
+                CellValue::Int(n) => {
+                    self.xml_buffer.extend_from_slice(b"<c r=\"");
+                    self.xml_buffer.extend_from_slice(col_letter.as_bytes());
+                    self.xml_buffer
+                        .extend_from_slice(row_num.to_string().as_bytes());
+                    self.xml_buffer.extend_from_slice(b"\"");
+                    if style_index > 0 {
+                        self.xml_buffer.extend_from_slice(b" s=\"");
+                        self.xml_buffer
+                            .extend_from_slice(style_index.to_string().as_bytes());
+                        self.xml_buffer.extend_from_slice(b"\"");
+                    }
+                    self.xml_buffer.extend_from_slice(b"><v>");
+                    self.xml_buffer.extend_from_slice(n.to_string().as_bytes());
+                    self.xml_buffer.extend_from_slice(b"</v></c>");
+                }
+                CellValue::Float(f) => {
+                    self.xml_buffer.extend_from_slice(b"<c r=\"");
+                    self.xml_buffer.extend_from_slice(col_letter.as_bytes());
+                    self.xml_buffer
+                        .extend_from_slice(row_num.to_string().as_bytes());
+                    self.xml_buffer.extend_from_slice(b"\"");
+                    if style_index > 0 {
+                        self.xml_buffer.extend_from_slice(b" s=\"");
+                        self.xml_buffer
+                            .extend_from_slice(style_index.to_string().as_bytes());
+                        self.xml_buffer.extend_from_slice(b"\"");
+                    }
+                    self.xml_buffer.extend_from_slice(b"><v>");
+                    self.xml_buffer.extend_from_slice(f.to_string().as_bytes());
+                    self.xml_buffer.extend_from_slice(b"</v></c>");
+                }
+                CellValue::Bool(b) => {
+                    self.xml_buffer.extend_from_slice(b"<c r=\"");
+                    self.xml_buffer.extend_from_slice(col_letter.as_bytes());
+                    self.xml_buffer
+                        .extend_from_slice(row_num.to_string().as_bytes());
+                    self.xml_buffer.extend_from_slice(b"\"");
+                    if style_index > 0 {
+                        self.xml_buffer.extend_from_slice(b" s=\"");
+                        self.xml_buffer
+                            .extend_from_slice(style_index.to_string().as_bytes());
+                        self.xml_buffer.extend_from_slice(b"\"");
+                    }
+                    self.xml_buffer.extend_from_slice(b" t=\"b\"><v>");
+                    self.xml_buffer
+                        .extend_from_slice(if *b { b"1" } else { b"0" });
+                    self.xml_buffer.extend_from_slice(b"</v></c>");
+                }
+                CellValue::Formula(formula) => {
+                    self.xml_buffer.extend_from_slice(b"<c r=\"");
+                    self.xml_buffer.extend_from_slice(col_letter.as_bytes());
+                    self.xml_buffer
+                        .extend_from_slice(row_num.to_string().as_bytes());
+                    self.xml_buffer.extend_from_slice(b"\"");
+                    if style_index > 0 {
+                        self.xml_buffer.extend_from_slice(b" s=\"");
+                        self.xml_buffer
+                            .extend_from_slice(style_index.to_string().as_bytes());
+                        self.xml_buffer.extend_from_slice(b"\"");
+                    }
+                    self.xml_buffer.extend_from_slice(b"><f>");
+                    self.xml_buffer.extend_from_slice(formula.as_bytes());
+                    self.xml_buffer.extend_from_slice(b"</f></c>");
+                }
+                CellValue::DateTime(_) | CellValue::Error(_) => {
+                    let s = format!("{:?}", cell.value);
+                    let string_index = self.shared_strings.add_string(&s);
+                    self.xml_buffer.extend_from_slice(b"<c r=\"");
+                    self.xml_buffer.extend_from_slice(col_letter.as_bytes());
+                    self.xml_buffer
+                        .extend_from_slice(row_num.to_string().as_bytes());
+                    self.xml_buffer.extend_from_slice(b"\"");
+                    if style_index > 0 {
+                        self.xml_buffer.extend_from_slice(b" s=\"");
+                        self.xml_buffer
+                            .extend_from_slice(style_index.to_string().as_bytes());
+                        self.xml_buffer.extend_from_slice(b"\"");
+                    }
+                    self.xml_buffer.extend_from_slice(b" t=\"s\"><v>");
+                    self.xml_buffer
+                        .extend_from_slice(string_index.to_string().as_bytes());
+                    self.xml_buffer.extend_from_slice(b"</v></c>");
+                }
+            }
+        }
+
+        self.xml_buffer.extend_from_slice(b"</row>");
+
+        // Write buffer to zip
+        self.zip.write_all(&self.xml_buffer)?;
+
+        // Flush định kỳ để giới hạn memory
+        if self.current_row.is_multiple_of(self.flush_interval) {
+            self.zip.flush()?;
+        }
+
+        Ok(())
+    }
+
     fn col_to_letter(col: u32) -> String {
         let mut col_str = String::new();
         let mut n = col;
@@ -385,26 +539,50 @@ impl FastWorkbook {
     }
 
     fn write_styles(&mut self) -> Result<()> {
-        let xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        let xml = r##"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<numFmts count="0"/>
-<fonts count="1">
+<numFmts count="5">
+<numFmt numFmtId="164" formatCode="#,##0"/>
+<numFmt numFmtId="165" formatCode="#,##0.00"/>
+<numFmt numFmtId="166" formatCode="$#,##0.00"/>
+<numFmt numFmtId="167" formatCode="0.00%"/>
+<numFmt numFmtId="168" formatCode="MM/DD/YYYY HH:MM:SS"/>
+</numFmts>
+<fonts count="3">
 <font><sz val="11"/><name val="Calibri"/></font>
+<font><b/><sz val="11"/><name val="Calibri"/></font>
+<font><i/><sz val="11"/><name val="Calibri"/></font>
 </fonts>
-<fills count="2">
+<fills count="5">
 <fill><patternFill patternType="none"/></fill>
 <fill><patternFill patternType="gray125"/></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFFFFF00"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FF00FF00"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFFF0000"/></patternFill></fill>
 </fills>
-<borders count="1">
+<borders count="2">
 <border><left/><right/><top/><bottom/><diagonal/></border>
+<border><left style="thin"><color auto="1"/></left><right style="thin"><color auto="1"/></right><top style="thin"><color auto="1"/></top><bottom style="thin"><color auto="1"/></bottom><diagonal/></border>
 </borders>
 <cellStyleXfs count="1">
 <xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>
 </cellStyleXfs>
-<cellXfs count="1">
+<cellXfs count="14">
 <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="166" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="167" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="14" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="168" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="0" fontId="0" fillId="2" borderId="0" xfId="0" applyFill="1"/>
+<xf numFmtId="0" fontId="0" fillId="3" borderId="0" xfId="0" applyFill="1"/>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>
 </cellXfs>
-</styleSheet>"#;
+</styleSheet>"##;
         self.zip.write_all(xml.as_bytes())?;
         Ok(())
     }
