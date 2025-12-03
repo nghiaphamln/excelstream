@@ -20,15 +20,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 1. Header with bold formatting
     println!("Writing bold header...");
-    writer.write_header_bold(&["Style", "Example Value", "Description"])?;
+    writer.write_header_bold(["Style", "Example Value", "Description"])?;
 
     // 2. Default style (no formatting)
     writer.write_row_styled(&[
+        (CellValue::String("Default".to_string()), CellStyle::Default),
         (
-            CellValue::String("Default".to_string()),
+            CellValue::String("Plain text".to_string()),
             CellStyle::Default,
         ),
-        (CellValue::String("Plain text".to_string()), CellStyle::Default),
         (
             CellValue::String("No special formatting".to_string()),
             CellStyle::Default,
@@ -216,8 +216,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ])?;
 
     // Demonstrate write_row_with_style() - all cells with same style
-    writer.write_row(&["", "", ""])?; // Empty row
-    writer.write_header_bold(&["Convenience Method Demo"])?;
+    writer.write_row(["", "", ""])?; // Empty row
+    writer.write_header_bold(["Convenience Method Demo"])?;
 
     writer.write_row_with_style(
         &[
@@ -230,8 +230,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // Practical example: Financial report
-    writer.write_row(&["", "", ""])?; // Empty row
-    writer.write_header_bold(&["Item", "Amount", "Change %"])?;
+    writer.write_row(["", "", ""])?; // Empty row
+    writer.write_header_bold(["Item", "Amount", "Change %"])?;
 
     writer.write_row_styled(&[
         (CellValue::String("Revenue".to_string()), CellStyle::Default),
@@ -240,7 +240,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ])?;
 
     writer.write_row_styled(&[
-        (CellValue::String("Expenses".to_string()), CellStyle::Default),
+        (
+            CellValue::String("Expenses".to_string()),
+            CellStyle::Default,
+        ),
         (CellValue::Float(95000.00), CellStyle::NumberCurrency),
         (CellValue::Float(0.08), CellStyle::NumberPercentage),
     ])?;
