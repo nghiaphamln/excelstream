@@ -29,6 +29,10 @@ pub struct FastWorkbook {
     column_widths: HashMap<u32, f64>, // column index -> width in Excel units
     next_row_height: Option<f64>,     // height for next row in points
     sheet_data_started: bool,         // track if <sheetData> element has been started
+    
+    // Dimension tracking for current worksheet
+    max_row: u32,    // maximum row number written
+    max_col: u32,    // maximum column number written
 }
 
 impl FastWorkbook {
@@ -78,6 +82,10 @@ impl FastWorkbook {
             column_widths: HashMap::new(),
             next_row_height: None,
             sheet_data_started: false,
+            
+            // Initialize dimension tracking
+            max_row: 0,
+            max_col: 0,
         })
     }
 
@@ -203,6 +211,10 @@ impl FastWorkbook {
         let sheet_id = self.worksheet_count;
 
         self.worksheets.push(name.to_string());
+        
+        // Reset dimension tracking for new worksheet
+        self.max_row = 0;
+        self.max_col = 0;
 
         let options = Self::file_options();
 
@@ -223,13 +235,10 @@ impl FastWorkbook {
         )?;
         xml_writer.close_start_tag()?;
         
-        // Add dimension (will be A1:B2 for first sheet, A1 for others)
-        // TODO: calculate actual dimension based on data written
-        if sheet_id == 1 {
-            xml_writer.write_str("<dimension ref=\"A1:B2\"/>")?;
-        } else {
-            xml_writer.write_str("<dimension ref=\"A1\"/>")?;
-        }
+        // Dimension will be written in finish_current_worksheet() when we know the actual range
+        // For now, just write a placeholder
+        xml_writer.write_str("<dimension ref=\"A1\"/>")?;
+        
         xml_writer.write_str("<sheetViews><sheetView")?;
         if sheet_id == 1 {
             xml_writer.write_str(" tabSelected=\"1\"")?;
@@ -262,6 +271,12 @@ impl FastWorkbook {
 
         self.current_row += 1;
         let row_num = self.current_row;
+        
+        // Update dimension tracking
+        self.max_row = self.max_row.max(row_num);
+        if !values.is_empty() {
+            self.max_col = self.max_col.max(values.len() as u32);
+        }
 
         // Get row height if set
         let row_height = self.next_row_height.take();
@@ -341,6 +356,12 @@ impl FastWorkbook {
 
         self.current_row += 1;
         let row_num = self.current_row;
+        
+        // Update dimension tracking
+        self.max_row = self.max_row.max(row_num);
+        if !cells.is_empty() {
+            self.max_col = self.max_col.max(cells.len() as u32);
+        }
 
         // Get row height if set
         let row_height = self.next_row_height.take();
@@ -667,12 +688,49 @@ impl FastWorkbook {
     }
 
     fn write_workbook_rels(&mut self) -> Result<()> {
-        // Emit reference workbook rels from rust_xlsxwriter sample to match exact ordering and rIds
-        let xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet3.xml"/><Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/><Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId6" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/></Relationships>"#;
-
-        let mut writer = &mut self.zip;
-        writer.write_all(xml.as_bytes())?;
+        let mut xml_writer = XmlWriter::new(&mut self.zip);
+        
+        xml_writer.write_str("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")?;
+        xml_writer.start_element("Relationships")?;
+        xml_writer.attribute("xmlns", "http://schemas.openxmlformats.org/package/2006/relationships")?;
+        xml_writer.close_start_tag()?;
+        
+        // Write worksheet relationships dynamically based on actual worksheets
+        for (idx, _) in self.worksheets.iter().enumerate() {
+            let rid = idx + 1;
+            let sheet_num = idx + 1;
+            
+            xml_writer.start_element("Relationship")?;
+            xml_writer.attribute("Id", &format!("rId{}", rid))?;
+            xml_writer.attribute("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet")?;
+            xml_writer.attribute("Target", &format!("worksheets/sheet{}.xml", sheet_num))?;
+            xml_writer.write_raw(b"/>")?;
+        }
+        
+        // Theme, styles, and sharedStrings (fixed rIds after worksheets)
+        let next_rid = self.worksheets.len() + 1;
+        
+        xml_writer.start_element("Relationship")?;
+        xml_writer.attribute("Id", &format!("rId{}", next_rid))?;
+        xml_writer.attribute("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme")?;
+        xml_writer.attribute("Target", "theme/theme1.xml")?;
+        xml_writer.write_raw(b"/>")?;
+        
+        xml_writer.start_element("Relationship")?;
+        xml_writer.attribute("Id", &format!("rId{}", next_rid + 1))?;
+        xml_writer.attribute("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles")?;
+        xml_writer.attribute("Target", "styles.xml")?;
+        xml_writer.write_raw(b"/>")?;
+        
+        xml_writer.start_element("Relationship")?;
+        xml_writer.attribute("Id", &format!("rId{}", next_rid + 2))?;
+        xml_writer.attribute("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings")?;
+        xml_writer.attribute("Target", "sharedStrings.xml")?;
+        xml_writer.write_raw(b"/>")?;
+        
+        xml_writer.end_element("Relationships")?;
+        xml_writer.flush()?;
+        
         Ok(())
     }
 
