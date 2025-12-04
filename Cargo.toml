@@ -1,6 +1,6 @@
 [package]
 name = "excelstream"
-version = "0.4.3"
+version = "0.4.4"
 edition = "2021"
 authors = ["Ton That Vu <ttvuhm@gmail.com>"]
 description = "High-performance streaming Excel library - Read/write large XLSX files with memory-efficient streaming"
@@ -27,12 +27,12 @@ rayon = { version = "1.8", optional = true }
 zip = "0.6"
 tempfile = "3.8"
 indexmap = "2"
+chrono = { version = "0.4", features = ["clock"] }
 # PostgreSQL dependencies (optional, only for examples)
 postgres = { version = "0.19", features = ["with-chrono-0_4"], optional = true }
 tokio-postgres = { version = "0.7", features = ["with-chrono-0_4"], optional = true }
 deadpool-postgres = { version = "0.14", optional = true }
 tokio = { version = "1", features = ["full"], optional = true }
-chrono = { version = "0.4", optional = true }
 
 [dev-dependencies]
 tempfile = "3.8"
@@ -42,8 +42,8 @@ criterion = "0.5"
 default = []
 serde = ["dep:serde"]
 parallel = ["dep:rayon"]
-postgres = ["dep:postgres", "dep:chrono"]
-postgres-async = ["dep:tokio-postgres", "dep:deadpool-postgres", "dep:tokio", "dep:chrono"]
+postgres = ["dep:postgres"]
+postgres-async = ["dep:tokio-postgres", "dep:deadpool-postgres", "dep:tokio"]
 
 [[bench]]
 name = "streaming_benchmark"

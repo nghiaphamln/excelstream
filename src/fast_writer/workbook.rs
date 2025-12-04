@@ -30,9 +30,10 @@ pub struct FastWorkbook {
     next_row_height: Option<f64>,     // height for next row in points
     sheet_data_started: bool,         // track if <sheetData> element has been started
 
-    // Dimension tracking for current worksheet
-    max_row: u32, // maximum row number written
-    max_col: u32, // maximum column number written
+    // Dimension tracking per worksheet
+    sheet_dimensions: Vec<(u32, u32)>, // (max_row, max_col) for each sheet
+    max_row: u32, // maximum row number written in current worksheet
+    max_col: u32, // maximum column number written in current worksheet
 }
 
 impl FastWorkbook {
@@ -42,24 +43,8 @@ impl FastWorkbook {
         let writer = BufWriter::with_capacity(64 * 1024, file); // 64KB buffer
         let mut zip = ZipWriter::new(writer);
 
-        let options = Self::file_options();
-
-        // Write [Content_Types].xml - REMOVED from new(), will write in close() with correct count
-        // zip.start_file("[Content_Types].xml", options)?;
-        // Write placeholder - will be replaced later
-        // zip.write_all(b"PLACEHOLDER")?;
-
-        // Write _rels/.rels
-        zip.start_file("_rels/.rels", options)?;
-        Self::write_root_rels(&mut zip)?;
-
-        // Write docProps/core.xml
-        zip.start_file("docProps/core.xml", options)?;
-        Self::write_core_props(&mut zip)?;
-
-        // Write docProps/app.xml
-        zip.start_file("docProps/app.xml", options)?;
-        Self::write_app_props(&mut zip)?;
+        // NOTE: [Content_Types].xml, _rels/.rels, and docProps files are written in close()
+        // to ensure correct ZIP order required by Office Open XML spec
 
         // Pre-generate cell reference cache for first 100 columns (A-CV)
         let mut cell_ref_cache = Vec::with_capacity(100);
@@ -85,6 +70,7 @@ impl FastWorkbook {
             sheet_data_started: false,
 
             // Initialize dimension tracking
+            sheet_dimensions: Vec::new(),
             max_row: 0,
             max_col: 0,
         })
@@ -236,9 +222,10 @@ impl FastWorkbook {
         )?;
         xml_writer.close_start_tag()?;
 
-        // Dimension will be written in finish_current_worksheet() when we know the actual range
-        // For now, just write a placeholder
-        xml_writer.write_str("<dimension ref=\"A1\"/>")?;
+        // Write dimension - use a reasonable estimate
+        // For streaming approach, we can't know exact bounds until after writing all data
+        // So we estimate: most sheets < 10000 rows. Excel accepts over-estimated dimensions.
+        xml_writer.write_str("<dimension ref=\"A1:ZZ10000\"/>")?;
 
         xml_writer.write_str("<sheetViews><sheetView")?;
         if sheet_id == 1 {
@@ -537,10 +524,23 @@ impl FastWorkbook {
         col_str
     }
 
+    /// Generate dimension reference string from max row and column (e.g., "A1:D4")
+    fn get_dimension_ref(max_row: u32, max_col: u32) -> String {
+        if max_row == 0 || max_col == 0 {
+            "A1".to_string() // Empty sheet
+        } else {
+            let col_letter = Self::col_to_letter(max_col);
+            format!("A1:{}{}",col_letter, max_row)
+        }
+    }
+
     fn finish_current_worksheet(&mut self) -> Result<()> {
         if self.current_worksheet.is_none() {
             return Ok(());
         }
+
+        // Save dimensions for this worksheet before closing
+        self.sheet_dimensions.push((self.max_row, self.max_col));
 
         // Ensure sheetData has been started (important for empty sheets)
         self.ensure_sheet_data_started()?;
@@ -572,7 +572,36 @@ impl FastWorkbook {
 
         let options = Self::file_options();
 
-        // Write shared strings
+        // === CORRECT ZIP ORDER FOR OFFICE OPEN XML ===
+        // 1. [Content_Types].xml - MUST be first
+        self.zip.start_file("[Content_Types].xml", options)?;
+        self.write_content_types()?;
+
+        // 2. _rels/.rels - should be early
+        self.zip.start_file("_rels/.rels", options)?;
+        Self::write_root_rels(&mut self.zip)?;
+
+        // 3. xl/_rels/workbook.xml.rels
+        self.zip.start_file("xl/_rels/workbook.xml.rels", options)?;
+        self.write_workbook_rels()?;
+
+        // 4. xl/theme/theme1.xml
+        self.zip.start_file("xl/theme/theme1.xml", options)?;
+        self.write_theme()?;
+
+        // 5. xl/styles.xml
+        self.zip.start_file("xl/styles.xml", options)?;
+        self.write_styles()?;
+
+        // 6. xl/workbook.xml
+        self.zip.start_file("xl/workbook.xml", options)?;
+        self.write_workbook_xml()?;
+        self.zip.flush()?;
+
+        // 7. xl/worksheets/sheet*.xml (already written during write process)
+        // These are written via add_worksheet(), so they're already in ZIP
+
+        // 8. xl/sharedStrings.xml
         self.zip.start_file("xl/sharedStrings.xml", options)?;
         {
             let mut xml_writer = XmlWriter::new(&mut self.zip);
@@ -580,26 +609,13 @@ impl FastWorkbook {
             xml_writer.flush()?;
         }
 
-        // Write workbook.xml
-        self.zip.start_file("xl/workbook.xml", options)?;
-        self.write_workbook_xml()?;
-        self.zip.flush()?;
+        // 9. docProps/core.xml
+        self.zip.start_file("docProps/core.xml", options)?;
+        Self::write_core_props(&mut self.zip)?;
 
-        // Write xl/_rels/workbook.xml.rels
-        self.zip.start_file("xl/_rels/workbook.xml.rels", options)?;
-        self.write_workbook_rels()?;
-
-        // Write styles.xml
-        self.zip.start_file("xl/styles.xml", options)?;
-        self.write_styles()?;
-
-        // Write theme
-        self.zip.start_file("xl/theme/theme1.xml", options)?;
-        self.write_theme()?;
-
-        // Write [Content_Types].xml at the end with correct worksheet count
-        self.zip.start_file("[Content_Types].xml", options)?;
-        self.write_content_types()?;
+        // 10. docProps/app.xml
+        self.zip.start_file("docProps/app.xml", options)?;
+        Self::write_app_props(&mut self.zip, &self.worksheets)?;
 
         self.zip.finish()?;
         Ok(())
@@ -708,29 +724,54 @@ impl FastWorkbook {
     }
 
     fn write_core_props<W: Write>(writer: &mut W) -> Result<()> {
-        let xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-<dc:creator>rust-excelize</dc:creator>
-<cp:lastModifiedBy>rust-excelize</cp:lastModifiedBy>
-<dcterms:created xsi:type="dcterms:W3CDTF">2024-01-01T00:00:00Z</dcterms:created>
-<dcterms:modified xsi:type="dcterms:W3CDTF">2024-01-01T00:00:00Z</dcterms:modified>
-</cp:coreProperties>"#;
+        // Get current timestamp in ISO 8601 format
+        let now = chrono::Utc::now();
+        let timestamp = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+        
+        let xml = format!(
+            r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:creator></dc:creator><cp:lastModifiedBy></cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">{}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">{}</dcterms:modified></cp:coreProperties>"#,
+            timestamp, timestamp
+        );
+        
         writer.write_all(xml.as_bytes())?;
         Ok(())
     }
 
-    fn write_app_props<W: Write>(writer: &mut W) -> Result<()> {
-        let xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">
-<Application>rust-excelize</Application>
-<DocSecurity>0</DocSecurity>
-<ScaleCrop>false</ScaleCrop>
-<Company></Company>
-<LinksUpToDate>false</LinksUpToDate>
-<SharedDoc>false</SharedDoc>
-<HyperlinksChanged>false</HyperlinksChanged>
-<AppVersion>1.0</AppVersion>
-</Properties>"#;
+    fn write_app_props<W: Write>(writer: &mut W, worksheets: &[String]) -> Result<()> {
+        // Build TitlesOfParts dynamically based on worksheet names
+        let mut titles_xml = String::from("<vt:vector size=\"");
+        titles_xml.push_str(&worksheets.len().to_string());
+        titles_xml.push_str("\" baseType=\"lpstr\">");
+        
+        for name in worksheets {
+            titles_xml.push_str("<vt:lpstr>");
+            // Escape XML special characters
+            let escaped = name
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&apos;");
+            titles_xml.push_str(&escaped);
+            titles_xml.push_str("</vt:lpstr>");
+        }
+        
+        titles_xml.push_str("</vt:vector>");
+        
+        // Build HeadingPairs with correct count
+        let heading_pairs = format!(
+            r#"<vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>Worksheets</vt:lpstr></vt:variant><vt:variant><vt:i4>{}</vt:i4></vt:variant></vt:vector>"#,
+            worksheets.len()
+        );
+        
+        let xml = format!(
+            r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>Microsoft Excel</Application><DocSecurity>0</DocSecurity><ScaleCrop>false</ScaleCrop><HeadingPairs>{}</HeadingPairs><TitlesOfParts>{}</TitlesOfParts><Company></Company><LinksUpToDate>false</LinksUpToDate><SharedDoc>false</SharedDoc><HyperlinksChanged>false</HyperlinksChanged><AppVersion>12.0000</AppVersion></Properties>"#,
+            heading_pairs,
+            titles_xml
+        );
+        
         writer.write_all(xml.as_bytes())?;
         Ok(())
     }

@@ -10,6 +10,7 @@ pub struct SharedStrings {
     strings: Vec<String>,
     string_map: IndexMap<String, u32>,
     max_unique_strings: usize, // Giới hạn số string unique để tiết kiệm memory
+    total_count: u32,          // Track total number of string references (for count attribute)
 }
 
 impl SharedStrings {
@@ -18,6 +19,7 @@ impl SharedStrings {
             strings: Vec::with_capacity(1000),
             string_map: IndexMap::with_capacity(1000),
             max_unique_strings: 100_000, // Giới hạn 100K unique strings
+            total_count: 0,
         }
     }
 
@@ -27,11 +29,15 @@ impl SharedStrings {
             strings: Vec::with_capacity(capacity),
             string_map: IndexMap::with_capacity(capacity),
             max_unique_strings: max_unique,
+            total_count: 0,
         }
     }
 
     /// Add a string and get its index
     pub fn add_string(&mut self, s: &str) -> u32 {
+        // Increment total count for every string reference
+        self.total_count += 1;
+        
         if let Some(&index) = self.string_map.get(s) {
             return index;
         }
@@ -66,7 +72,9 @@ impl SharedStrings {
             "xmlns",
             "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
         )?;
-        writer.attribute_int("count", self.strings.len() as i64)?;
+        // count = total number of string cell references
+        // uniqueCount = number of unique strings
+        writer.attribute_int("count", self.total_count as i64)?;
         writer.attribute_int("uniqueCount", self.strings.len() as i64)?;
         writer.close_start_tag()?;
 
