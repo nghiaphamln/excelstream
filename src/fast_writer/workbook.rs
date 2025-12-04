@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufWriter, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use zip::write::{FileOptions, ZipWriter};
 use zip::CompressionMethod;
 
@@ -14,6 +14,7 @@ use crate::error::Result;
 
 /// Fast workbook for high-performance Excel writing
 pub struct FastWorkbook {
+    file_path: PathBuf, // Store file path for ZIP reordering after close
     zip: ZipWriter<BufWriter<File>>,
     shared_strings: SharedStrings,
     worksheets: Vec<String>,
@@ -39,6 +40,7 @@ pub struct FastWorkbook {
 impl FastWorkbook {
     /// Create a new fast workbook
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let path = path.as_ref();
         let file = File::create(path)?;
         let writer = BufWriter::with_capacity(64 * 1024, file); // 64KB buffer
         let zip = ZipWriter::new(writer);
@@ -53,6 +55,7 @@ impl FastWorkbook {
         }
 
         Ok(FastWorkbook {
+            file_path: path.to_path_buf(),
             zip,
             shared_strings: SharedStrings::new(),
             worksheets: Vec::new(),
@@ -619,6 +622,11 @@ impl FastWorkbook {
         Self::write_app_props(&mut self.zip, &self.worksheets)?;
 
         self.zip.finish()?;
+
+        // CRITICAL: Reorder ZIP file to put [Content_Types].xml first
+        // This is required by Office Open XML spec and enforced strictly by Excel Online
+        crate::fix_xlsx_zip_order(&self.file_path)?;
+
         Ok(())
     }
 
