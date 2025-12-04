@@ -44,9 +44,10 @@ impl FastWorkbook {
 
         let options = Self::file_options();
 
-        // Write [Content_Types].xml
-        zip.start_file("[Content_Types].xml", options)?;
-        Self::write_content_types(&mut zip)?;
+        // Write [Content_Types].xml - REMOVED from new(), will write in close() with correct count
+        // zip.start_file("[Content_Types].xml", options)?;
+        // Write placeholder - will be replaced later
+        // zip.write_all(b"PLACEHOLDER")?;
 
         // Write _rels/.rels
         zip.start_file("_rels/.rels", options)?;
@@ -596,16 +597,77 @@ impl FastWorkbook {
         self.zip.start_file("xl/theme/theme1.xml", options)?;
         self.write_theme()?;
 
+        // Write [Content_Types].xml at the end with correct worksheet count
+        self.zip.start_file("[Content_Types].xml", options)?;
+        self.write_content_types()?;
+
         self.zip.finish()?;
         Ok(())
     }
 
-    fn write_content_types<W: Write>(writer: &mut W) -> Result<()> {
-        // Emit reference [Content_Types].xml from rust_xlsxwriter sample to match exact ordering
-        let xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/xl/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet3.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/></Types>"#;
-
-        writer.write_all(xml.as_bytes())?;
+    fn write_content_types(&mut self) -> Result<()> {
+        let mut xml_writer = XmlWriter::new(&mut self.zip);
+        
+        xml_writer.write_str("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")?;
+        xml_writer.start_element("Types")?;
+        xml_writer.attribute("xmlns", "http://schemas.openxmlformats.org/package/2006/content-types")?;
+        xml_writer.close_start_tag()?;
+        
+        // Default extensions
+        xml_writer.start_element("Default")?;
+        xml_writer.attribute("Extension", "rels")?;
+        xml_writer.attribute("ContentType", "application/vnd.openxmlformats-package.relationships+xml")?;
+        xml_writer.write_raw(b"/>")?;
+        
+        xml_writer.start_element("Default")?;
+        xml_writer.attribute("Extension", "xml")?;
+        xml_writer.attribute("ContentType", "application/xml")?;
+        xml_writer.write_raw(b"/>")?;
+        
+        // docProps overrides
+        xml_writer.start_element("Override")?;
+        xml_writer.attribute("PartName", "/docProps/app.xml")?;
+        xml_writer.attribute("ContentType", "application/vnd.openxmlformats-officedocument.extended-properties+xml")?;
+        xml_writer.write_raw(b"/>")?;
+        
+        xml_writer.start_element("Override")?;
+        xml_writer.attribute("PartName", "/docProps/core.xml")?;
+        xml_writer.attribute("ContentType", "application/vnd.openxmlformats-package.core-properties+xml")?;
+        xml_writer.write_raw(b"/>")?;
+        
+        // xl overrides
+        xml_writer.start_element("Override")?;
+        xml_writer.attribute("PartName", "/xl/styles.xml")?;
+        xml_writer.attribute("ContentType", "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml")?;
+        xml_writer.write_raw(b"/>")?;
+        
+        xml_writer.start_element("Override")?;
+        xml_writer.attribute("PartName", "/xl/theme/theme1.xml")?;
+        xml_writer.attribute("ContentType", "application/vnd.openxmlformats-officedocument.theme+xml")?;
+        xml_writer.write_raw(b"/>")?;
+        
+        xml_writer.start_element("Override")?;
+        xml_writer.attribute("PartName", "/xl/workbook.xml")?;
+        xml_writer.attribute("ContentType", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml")?;
+        xml_writer.write_raw(b"/>")?;
+        
+        // Worksheet overrides - DYNAMIC based on actual worksheets!
+        for i in 1..=self.worksheet_count {
+            xml_writer.start_element("Override")?;
+            xml_writer.attribute("PartName", &format!("/xl/worksheets/sheet{}.xml", i))?;
+            xml_writer.attribute("ContentType", "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml")?;
+            xml_writer.write_raw(b"/>")?;
+        }
+        
+        // sharedStrings override
+        xml_writer.start_element("Override")?;
+        xml_writer.attribute("PartName", "/xl/sharedStrings.xml")?;
+        xml_writer.attribute("ContentType", "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml")?;
+        xml_writer.write_raw(b"/>")?;
+        
+        xml_writer.end_element("Types")?;
+        xml_writer.flush()?;
+        
         Ok(())
     }
 
