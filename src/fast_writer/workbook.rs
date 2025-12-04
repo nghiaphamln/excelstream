@@ -32,8 +32,8 @@ pub struct FastWorkbook {
 
     // Dimension tracking per worksheet
     sheet_dimensions: Vec<(u32, u32)>, // (max_row, max_col) for each sheet
-    max_row: u32, // maximum row number written in current worksheet
-    max_col: u32, // maximum column number written in current worksheet
+    max_row: u32,                      // maximum row number written in current worksheet
+    max_col: u32,                      // maximum column number written in current worksheet
 }
 
 impl FastWorkbook {
@@ -41,7 +41,7 @@ impl FastWorkbook {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
         let file = File::create(path)?;
         let writer = BufWriter::with_capacity(64 * 1024, file); // 64KB buffer
-        let mut zip = ZipWriter::new(writer);
+        let zip = ZipWriter::new(writer);
 
         // NOTE: [Content_Types].xml, _rels/.rels, and docProps files are written in close()
         // to ensure correct ZIP order required by Office Open XML spec
@@ -525,12 +525,13 @@ impl FastWorkbook {
     }
 
     /// Generate dimension reference string from max row and column (e.g., "A1:D4")
+    #[allow(dead_code)]
     fn get_dimension_ref(max_row: u32, max_col: u32) -> String {
         if max_row == 0 || max_col == 0 {
             "A1".to_string() // Empty sheet
         } else {
             let col_letter = Self::col_to_letter(max_col);
-            format!("A1:{}{}",col_letter, max_row)
+            format!("A1:{}{}", col_letter, max_row)
         }
     }
 
@@ -727,13 +728,13 @@ impl FastWorkbook {
         // Get current timestamp in ISO 8601 format
         let now = chrono::Utc::now();
         let timestamp = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
-        
+
         let xml = format!(
             r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:creator></dc:creator><cp:lastModifiedBy></cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">{}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">{}</dcterms:modified></cp:coreProperties>"#,
             timestamp, timestamp
         );
-        
+
         writer.write_all(xml.as_bytes())?;
         Ok(())
     }
@@ -743,7 +744,7 @@ impl FastWorkbook {
         let mut titles_xml = String::from("<vt:vector size=\"");
         titles_xml.push_str(&worksheets.len().to_string());
         titles_xml.push_str("\" baseType=\"lpstr\">");
-        
+
         for name in worksheets {
             titles_xml.push_str("<vt:lpstr>");
             // Escape XML special characters
@@ -756,22 +757,21 @@ impl FastWorkbook {
             titles_xml.push_str(&escaped);
             titles_xml.push_str("</vt:lpstr>");
         }
-        
+
         titles_xml.push_str("</vt:vector>");
-        
+
         // Build HeadingPairs with correct count
         let heading_pairs = format!(
             r#"<vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>Worksheets</vt:lpstr></vt:variant><vt:variant><vt:i4>{}</vt:i4></vt:variant></vt:vector>"#,
             worksheets.len()
         );
-        
+
         let xml = format!(
             r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>Microsoft Excel</Application><DocSecurity>0</DocSecurity><ScaleCrop>false</ScaleCrop><HeadingPairs>{}</HeadingPairs><TitlesOfParts>{}</TitlesOfParts><Company></Company><LinksUpToDate>false</LinksUpToDate><SharedDoc>false</SharedDoc><HyperlinksChanged>false</HyperlinksChanged><AppVersion>12.0000</AppVersion></Properties>"#,
-            heading_pairs,
-            titles_xml
+            heading_pairs, titles_xml
         );
-        
+
         writer.write_all(xml.as_bytes())?;
         Ok(())
     }

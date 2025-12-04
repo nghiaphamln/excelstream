@@ -10,7 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if i > 1 {
             writer.add_sheet(&format!("Sheet{}", i))?;
         }
-        writer.write_row(&[&format!("Data in Sheet {}", i)])?;
+        writer.write_row([&format!("Data in Sheet {}", i)])?;
     }
 
     writer.save()?;

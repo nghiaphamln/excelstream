@@ -37,7 +37,7 @@ impl SharedStrings {
     pub fn add_string(&mut self, s: &str) -> u32 {
         // Increment total count for every string reference
         self.total_count += 1;
-        
+
         if let Some(&index) = self.string_map.get(s) {
             return index;
         }
