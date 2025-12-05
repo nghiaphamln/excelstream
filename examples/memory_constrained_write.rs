@@ -33,19 +33,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Time: {:?}\n", start.elapsed());
 
     println!("=== Recommendations ===");
-    println!("- Small pods (< 512MB): Use flush_interval = 100");
-    println!("- Medium pods (512MB - 1GB): Use flush_interval = 500");
-    println!("- Large pods (1-2GB): Use flush_interval = 1000 (default)");
-    println!("- Extra large pods (> 2GB): Use flush_interval = 5000 (maximum performance)");
+    println!("- Small pods (< 512MB): Use flush_interval=100, buffer=256KB, compression=1");
+    println!("- Medium pods (512MB-1GB): Use flush_interval=500, buffer=512KB, compression=3");
+    println!("- Large pods (1-2GB): Use flush_interval=1000, buffer=1MB, compression=6 (default)");
+    println!("- Extra large pods (> 2GB): Use flush_interval=5000, buffer=2MB, compression=6");
 
     Ok(())
 }
 
 fn test_default(filename: &str, num_rows: usize) -> Result<(), Box<dyn std::error::Error>> {
     let mut workbook = FastWorkbook::new(filename)?;
-    workbook.add_worksheet("Sheet1")?;
 
+    // Default compression level 6 (balanced)
     // Default: flush every 1000 rows
+    workbook.add_worksheet("Sheet1")?;
     write_data(&mut workbook, num_rows)?;
     workbook.close()?;
     Ok(())
@@ -60,6 +61,7 @@ fn test_aggressive_flush(
     // Configuration for memory-constrained pods
     workbook.set_flush_interval(100); // Flush every 100 rows
     workbook.set_max_buffer_size(256 * 1024); // 256KB max buffer
+    workbook.set_compression_level(1); // Fast compression for low memory
 
     workbook.add_worksheet("Sheet1")?;
     write_data(&mut workbook, num_rows)?;
@@ -70,9 +72,10 @@ fn test_aggressive_flush(
 fn test_balanced(filename: &str, num_rows: usize) -> Result<(), Box<dyn std::error::Error>> {
     let mut workbook = FastWorkbook::new(filename)?;
 
-    // Cấu hình cân bằng
+    // Balanced configuration
     workbook.set_flush_interval(500); // Flush every 500 rows
     workbook.set_max_buffer_size(512 * 1024); // 512KB max buffer
+    workbook.set_compression_level(3); // Moderate compression
 
     workbook.add_worksheet("Sheet1")?;
     write_data(&mut workbook, num_rows)?;
@@ -86,6 +89,7 @@ fn test_conservative(filename: &str, num_rows: usize) -> Result<(), Box<dyn std:
     // Configuration for maximum performance
     workbook.set_flush_interval(5000); // Flush every 5000 rows
     workbook.set_max_buffer_size(2 * 1024 * 1024); // 2MB max buffer
+    workbook.set_compression_level(6); // Balanced compression (default)
 
     workbook.add_worksheet("Sheet1")?;
     write_data(&mut workbook, num_rows)?;

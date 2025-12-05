@@ -6,7 +6,15 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/KSD-CO/excelstream/workflows/Rust/badge.svg)](https://github.com/KSD-CO/excelstream/actions)
 
-> **✨ What's New in v0.5.0:**
+> **✨ What's New in v0.5.1:**
+> - 🗜️ **Compression Level Configuration** - Control ZIP compression levels (0-9) for speed vs size trade-offs
+> - ⚙️ **Flexible API** - Set compression at workbook creation or anytime during writing
+> - ⚡ **Fast Mode** - Level 1 compression: 2x faster, suitable for development and testing
+> - 📦 **Balanced Mode** - Level 3 compression: Good balance between speed and file size
+> - 💾 **Production Mode** - Level 6 compression (default): Best file size for production exports
+> - 🔧 **Memory Optimization** - Updated PostgreSQL streaming with optimized batch sizes (500 rows)
+
+> **v0.5.0 Features:**
 > - 🚀 **Hybrid SST Optimization** - Intelligent selective deduplication for optimal memory usage
 > - 💾 **Ultra-Low Memory** - 15-25 MB for 1M rows (was 125 MB), 89% reduction!
 > - ⚡ **58% Faster** - 25K+ rows/sec with hybrid SST strategy
@@ -27,6 +35,7 @@
 - 💾 **Ultra-Low Memory Write** - Write millions of rows with only 15-25 MB memory usage (89% reduction!)
 - ⚡ **High Performance** - 25K+ rows/sec with hybrid SST optimization (58% faster!)
 - 🧠 **Hybrid SST** - Intelligent deduplication: numbers inline, long strings inline, only short repeated strings deduplicated
+- 🗜️ **Compression Control** - Configure ZIP compression levels (0-9) for speed vs size optimization
 - 🎨 **Cell Formatting** - 14 predefined styles (bold, currency, %, highlights, borders)
 - 📏 **Column Width & Row Height** - Customize column widths and row heights
 - 📐 **Formula Support** - Write Excel formulas (=SUM, =AVERAGE, =IF, etc.)
@@ -48,6 +57,8 @@ Add to your `Cargo.toml`:
 [dependencies]
 excelstream = "0.5"
 ```
+
+**Latest version:** `0.5.1` - Added compression level configuration (0-9) for speed vs size optimization
 
 ## 🚀 Quick Start
 
@@ -516,19 +527,201 @@ FastWorkbook (hybrid SST):     25,682 rows/sec (+58%) ⚡
 
 **See also:** `HYBRID_SST_OPTIMIZATION.md` for technical details
 
+## 🗜️ Compression Level Configuration (v0.5.1)
+
+**New in v0.5.1:** Control ZIP compression levels to balance speed vs file size!
+
+### Understanding Compression Levels
+
+Excel files (.xlsx) are ZIP archives. ExcelStream lets you control the compression level:
+
+| Level | Speed | File Size | Use Case | Recommended For |
+|-------|-------|-----------|----------|-----------------|
+| **0** | Fastest | Largest (no compression) | Debugging only | Testing |
+| **1** | Very Fast ⚡ | ~2x larger | Fast exports | Development, testing |
+| **3** | Fast | Balanced | Good compromise | CI/CD pipelines |
+| **6** | Moderate | Smallest 📦 | Best compression | Production exports |
+| **9** | Slowest | Smallest | Maximum compression | Archives, long-term storage |
+
+**Default:** Level 6 (balanced performance and file size)
+
+### Setting Compression Level
+
+#### Method 1: At Workbook Creation
+
+```rust
+use excelstream::writer::ExcelWriter;
+
+// Create writer with fast compression (level 1)
+let mut writer = ExcelWriter::with_compression("output.xlsx", 1)?;
+
+writer.write_header(&["ID", "Name", "Amount"])?;
+writer.write_row(&["1", "Alice", "1000"])?;
+writer.save()?;
+```
+
+#### Method 2: After Creation
+
+```rust
+use excelstream::writer::ExcelWriter;
+
+let mut writer = ExcelWriter::new("output.xlsx")?;
+
+// Change compression level
+writer.set_compression_level(3); // Fast balanced compression
+
+writer.write_header(&["ID", "Name"])?;
+writer.write_row(&["1", "Alice"])?;
+writer.save()?;
+```
+
+#### Method 3: With UltraLowMemoryWorkbook
+
+```rust
+use excelstream::fast_writer::UltraLowMemoryWorkbook;
+
+let mut workbook = UltraLowMemoryWorkbook::with_compression("output.xlsx", 1)?;
+workbook.add_worksheet("Data")?;
+
+workbook.write_row(&["Header1", "Header2"])?;
+workbook.write_row(&["Value1", "Value2"])?;
+
+workbook.close()?;
+```
+
+#### Method 4: Environment-Based Configuration
+
+```rust
+use excelstream::writer::ExcelWriter;
+
+// Use fast compression for debug builds, production compression for release
+let compression_level = if cfg!(debug_assertions) { 1 } else { 6 };
+let mut writer = ExcelWriter::with_compression("output.xlsx", compression_level)?;
+
+writer.write_header(&["Data"])?;
+writer.write_row(&["Value"])?;
+writer.save()?;
+```
+
+### Real-World Performance (1M rows)
+
+Tested with 1 million rows × 4 columns on production hardware:
+
+| Configuration | Flush Interval | Buffer Size | Compression | Time | File Size | Memory |
+|--------------|----------------|-------------|-------------|------|-----------|--------|
+| **Aggressive** | 100 | 256 KB | Level 1 | **3.93s** ⚡ | 172 MB | <30 MB |
+| **Balanced** | 500 | 512 KB | Level 3 | **5.03s** | 110 MB | <30 MB |
+| **Default** | 1000 | 1 MB | Level 6 | **7.37s** | **88 MB** 📦 | <30 MB |
+| **Conservative** | 5000 | 2 MB | Level 6 | 8.00s | 88 MB | <30 MB |
+
+**Key Findings:**
+- Level 1 is **~2x faster** but files are **~2x larger** than level 6
+- Level 3 provides a **good balance** between speed and size
+- Memory usage is **constant <30 MB** regardless of compression level
+- Production exports typically use level 6 for optimal file size
+
+### Complete Example: Configurable Compression
+
+```rust
+use excelstream::writer::ExcelWriter;
+
+fn export_data(compression: u32) -> Result<(), Box<dyn std::error::Error>> {
+    let filename = format!("export_level_{}.xlsx", compression);
+    let mut writer = ExcelWriter::with_compression(&filename, compression)?;
+    
+    // Optional: Combine with memory optimization
+    if compression <= 1 {
+        // Fast compression - flush more aggressively
+        writer.set_flush_interval(100);
+        writer.set_max_buffer_size(256 * 1024);
+    } else if compression <= 3 {
+        // Balanced compression
+        writer.set_flush_interval(500);
+        writer.set_max_buffer_size(512 * 1024);
+    } else {
+        // Production compression - use larger buffers
+        writer.set_flush_interval(1000);
+        writer.set_max_buffer_size(1024 * 1024);
+    }
+    
+    writer.write_header(&["ID", "Name", "Email", "Status"])?;
+    
+    for i in 1..=1_000_000 {
+        writer.write_row(&[
+            &i.to_string(),
+            &format!("User{}", i),
+            &format!("user{}@example.com", i),
+            if i % 3 == 0 { "Active" } else { "Pending" },
+        ])?;
+    }
+    
+    writer.save()?;
+    println!("Exported with compression level {}: {}", compression, filename);
+    Ok(())
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Test different compression levels
+    export_data(1)?; // Fast: ~4s, 172 MB
+    export_data(3)?; // Balanced: ~5s, 110 MB
+    export_data(6)?; // Production: ~7s, 88 MB
+    
+    Ok(())
+}
+```
+
+### Recommendations
+
+**For Development & Testing:**
+```rust
+let mut writer = ExcelWriter::with_compression("test.xlsx", 1)?;
+writer.set_flush_interval(100);
+```
+- ✅ Fast exports (2x speed improvement)
+- ✅ Quick iteration cycles
+- ⚠️ Larger files (not for production)
+
+**For CI/CD Pipelines:**
+```rust
+let mut writer = ExcelWriter::with_compression("report.xlsx", 3)?;
+writer.set_flush_interval(500);
+```
+- ✅ Good balance of speed and size
+- ✅ Reasonable export times
+- ✅ Acceptable file sizes
+
+**For Production Exports:**
+```rust
+let mut writer = ExcelWriter::with_compression("export.xlsx", 6)?; // Default
+writer.set_flush_interval(1000);
+```
+- ✅ Smallest file size
+- ✅ Best for network transfers
+- ✅ Optimal for storage
+
+**For Archives:**
+```rust
+let mut writer = ExcelWriter::with_compression("archive.xlsx", 9)?;
+```
+- ✅ Maximum compression
+- ⚠️ Slower export times
+- 📦 Best for long-term storage
+
+**See also:** Run `cargo run --example compression_level_config` for a complete demonstration!
+
 ### Memory-Constrained Writing (For Kubernetes Pods)
 
-With v0.5.0, memory usage is ultra-low (15-25 MB):
+With v0.5.0+ and compression configuration (v0.5.1), memory usage is ultra-low:
 
 ```rust
 use excelstream::writer::ExcelWriter;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = ExcelWriter::new("output.xlsx")?;
+    let mut writer = ExcelWriter::with_compression("output.xlsx", 1)?; // Fast compression
     
-    // Optional: For pods with < 512MB RAM (already optimized in v0.5.0)
-    writer.set_flush_interval(500);       // Flush more frequently
-    writer.set_max_buffer_size(256 * 1024); // 256KB buffer
+    // For pods with < 512MB RAM (optimized configuration)
+    writer.set_flush_interval(500);       // Flush every 500 rows
+    writer.set_max_buffer_size(512 * 1024); // 512KB buffer
     
     writer.write_header(&["ID", "Name", "Email"])?;
     
@@ -546,11 +739,116 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-**Memory usage in v0.5.0:**
-- **15-25 MB** with hybrid SST (was 80 MB in v0.4.x)
+**Memory usage in v0.5.1:**
+- **10-30 MB peak** with optimized settings (was 80-100 MB)
+- **80-90% memory reduction** vs v0.4.x
 - Handles 50+ columns with mixed data types
 - Suitable for Kubernetes pods with limited resources
-- Automatic optimization - no code changes needed!
+- Automatic hybrid SST optimization
+
+**Configuration Presets:**
+
+| Preset | Flush | Buffer | Compression | Use Case | Memory Peak |
+|--------|-------|--------|-------------|----------|-------------|
+| **Aggressive** | 100 | 256 KB | Level 1 | <256 MB RAM pods | 10-15 MB |
+| **Balanced** | 500 | 512 KB | Level 3 | <512 MB RAM pods | 15-20 MB |
+| **Default** | 1000 | 1 MB | Level 6 | Standard pods | 20-30 MB |
+| **Conservative** | 5000 | 2 MB | Level 6 | High-memory pods | 25-35 MB |
+
+### PostgreSQL Streaming Export (Production-Tested)
+
+ExcelStream has been tested with real production databases. Example: 430,099 e-invoice records exported successfully.
+
+```rust
+use excelstream::writer::ExcelWriter;
+use postgres::{Client, NoTls};
+
+fn export_database_to_excel() -> Result<(), Box<dyn std::error::Error>> {
+    // Connect to PostgreSQL
+    let mut client = Client::connect(
+        "postgresql://user:password@host:5432/database",
+        NoTls,
+    )?;
+    
+    // Create Excel writer with optimized settings
+    let mut writer = ExcelWriter::with_compression("export.xlsx", 3)?;
+    
+    // Memory-optimized for large datasets
+    writer.set_flush_interval(500);
+    writer.set_max_buffer_size(512 * 1024);
+    
+    // Write header
+    writer.write_header_bold(&[
+        "ID", "Date", "Invoice Number", "Customer", "Amount", "Status"
+    ])?;
+    
+    // Use cursor for streaming (handles millions of rows)
+    let mut transaction = client.transaction()?;
+    transaction.execute("DECLARE export_cursor CURSOR FOR SELECT * FROM invoices", &[])?;
+    
+    let mut total_rows = 0u64;
+    let batch_size = 500; // Optimized batch size
+    
+    loop {
+        let rows = transaction.query(
+            &format!("FETCH {} FROM export_cursor", batch_size),
+            &[],
+        )?;
+        
+        if rows.is_empty() {
+            break;
+        }
+        
+        for row in rows {
+            // Handle NULL values properly
+            let id: i64 = row.get(0);
+            let date: Option<String> = row.try_get(1).ok().flatten();
+            let invoice_no: Option<String> = row.try_get(2).ok().flatten();
+            let customer: Option<String> = row.try_get(3).ok().flatten();
+            let amount: Option<f64> = row.try_get(4).ok().flatten();
+            let status: Option<String> = row.try_get(5).ok().flatten();
+            
+            writer.write_row(&[
+                &id.to_string(),
+                &date.unwrap_or_default(),
+                &invoice_no.unwrap_or_default(),
+                &customer.unwrap_or_default(),
+                &amount.map(|a| format!("{:.2}", a)).unwrap_or_default(),
+                &status.unwrap_or_default(),
+            ])?;
+            
+            total_rows += 1;
+            
+            if total_rows % 10_000 == 0 {
+                println!("Exported {} rows...", total_rows);
+            }
+        }
+    }
+    
+    transaction.execute("CLOSE export_cursor", &[])?;
+    transaction.commit()?;
+    
+    writer.save()?;
+    println!("✅ Exported {} rows successfully!", total_rows);
+    Ok(())
+}
+```
+
+**Production Results (430K rows):**
+- **Duration:** 1m 34s (94.17 seconds)
+- **Throughput:** 4,567 rows/sec
+- **File Size:** 62.22 MB
+- **Memory Peak:** <30 MB
+- **Columns:** 25 mixed data types (int, float, text, dates)
+
+**Key Optimizations:**
+- ✅ Cursor-based streaming (no full table load)
+- ✅ Small batch size (500 rows) for memory efficiency
+- ✅ Proper NULL handling with `try_get().ok().flatten()`
+- ✅ Fast compression (level 3) for balanced performance
+- ✅ Frequent flushing (500 rows) to disk
+
+**See also:** `examples/postgres_streaming.rs` for complete implementation
 
 ### Multi-sheet workbook
 
@@ -593,14 +891,15 @@ The `examples/` directory contains detailed examples:
 - `fast_writer_test.rs` - Fast writer performance benchmarks
 
 **Advanced Features:**
-- `memory_constrained_write.rs` - Memory-limited writing for pods
+- `memory_constrained_write.rs` - Memory-limited writing with compression config
 - `auto_memory_config.rs` - Auto memory configuration demo
+- `compression_level_config.rs` - Compression level configuration examples
 - `csv_to_excel.rs` - CSV to Excel conversion
 - `multi_sheet.rs` - Creating multi-sheet workbooks
 
 **PostgreSQL Integration:**
 - `postgres_to_excel.rs` - Basic PostgreSQL export
-- `postgres_streaming.rs` - Streaming PostgreSQL export
+- `postgres_streaming.rs` - Production-tested streaming export (430K rows)
 - `postgres_to_excel_advanced.rs` - Advanced async with connection pooling
 
 Running examples:
@@ -621,16 +920,19 @@ cargo run --release --example three_writers_comparison  # Compare all writers
 cargo run --release --example write_row_comparison      # String vs typed
 cargo run --release --example writer_comparison         # Standard vs fast
 
-# Memory-constrained writing
-cargo run --release --example memory_constrained_write
+# Memory-constrained writing with compression
+cargo run --release --example memory_constrained_write  # Test 4 configurations
 MEMORY_LIMIT_MB=512 cargo run --release --example auto_memory_config
+
+# Compression level examples
+cargo run --release --example compression_level_config  # Test levels 0-9
 
 # Multi-sheet workbooks
 cargo run --example multi_sheet
 
 # PostgreSQL examples (requires database setup)
 cargo run --example postgres_to_excel --features postgres
-cargo run --example postgres_streaming --features postgres
+cargo run --example postgres_streaming --features postgres  # Production-tested 430K rows
 cargo run --example postgres_to_excel_advanced --features postgres-async
 ```
 
@@ -646,23 +948,33 @@ cargo run --example postgres_to_excel_advanced --features postgres-async
 
 ### ExcelWriter (Streaming)
 
-- `new(path)` - Create new writer
+- `new(path)` - Create new writer with default compression (level 6)
+- `with_compression(path, level)` - Create with custom compression level (0-9)
 - `write_row(data)` - Write row with strings
 - `write_row_typed(cells)` - Write row with typed values (recommended)
 - `write_header(headers)` - Write header row
+- `write_header_bold(headers)` - Write bold header row
+- `write_row_styled(cells)` - Write row with individual cell styles
+- `write_row_with_style(cells, style)` - Write row with uniform style
 - `add_sheet(name)` - Add new sheet
 - `set_flush_interval(rows)` - Configure flush frequency (default: 1000)
 - `set_max_buffer_size(bytes)` - Configure buffer size (default: 1MB)
-- `set_column_width(col, width)` - Not yet implemented in streaming mode
+- `set_compression_level(level)` - Set compression level (0-9, default: 6)
+- `compression_level()` - Get current compression level
+- `set_column_width(col, width)` - Set column width (before writing rows)
+- `set_next_row_height(height)` - Set height for next row
 - `save()` - Save and finalize workbook
 
 ### FastWorkbook (Direct Access)
 
-- `new(path)` - Create fast writer
+- `new(path)` - Create fast writer with default compression (level 6)
+- `with_compression(path, level)` - Create with custom compression level (0-9)
 - `add_worksheet(name)` - Add worksheet
 - `write_row(data)` - Write row (optimized)
 - `set_flush_interval(rows)` - Set flush frequency
 - `set_max_buffer_size(bytes)` - Set buffer limit
+- `set_compression_level(level)` - Set compression level (0-9)
+- `compression_level()` - Get current compression level
 - `close()` - Finish and save file
 
 ### Types

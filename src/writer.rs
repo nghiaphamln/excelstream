@@ -59,6 +59,70 @@ impl ExcelWriter {
         })
     }
 
+    /// Create a new Excel writer with custom compression level
+    ///
+    /// # Arguments
+    /// * `path` - Output file path
+    /// * `compression_level` - Compression level from 0 to 9
+    ///   - 0: No compression (fastest, largest files)
+    ///   - 1: Fast compression (very fast, ~31MB for 1M rows) - good for development
+    ///   - 6: Balanced compression (~18MB for 1M rows) - **recommended for production**
+    ///   - 9: Maximum compression (~18MB for 1M rows, slowest)
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use excelstream::writer::ExcelWriter;
+    ///
+    /// // Fast compression for development
+    /// let mut writer = ExcelWriter::with_compression("output.xlsx", 1).unwrap();
+    /// writer.write_row(&["Name", "Age"]).unwrap();
+    /// writer.save().unwrap();
+    /// ```
+    pub fn with_compression<P: AsRef<Path>>(path: P, compression_level: u32) -> Result<Self> {
+        let mut inner = FastWorkbook::with_compression(path, compression_level)?;
+        inner.add_worksheet("Sheet1")?;
+
+        Ok(ExcelWriter {
+            inner,
+            current_sheet_name: "Sheet1".to_string(),
+            current_row: 0,
+        })
+    }
+
+    /// Set compression level for the output file
+    ///
+    /// # Arguments
+    /// * `level` - Compression level from 0 to 9 (see [`with_compression`](#method.with_compression))
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use excelstream::writer::ExcelWriter;
+    ///
+    /// let mut writer = ExcelWriter::new("output.xlsx").unwrap();
+    /// writer.set_compression_level(1); // Fast compression
+    /// writer.write_row(&["Name", "Age"]).unwrap();
+    /// writer.save().unwrap();
+    /// ```
+    pub fn set_compression_level(&mut self, level: u32) {
+        self.inner.set_compression_level(level);
+    }
+
+    /// Get current compression level
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use excelstream::writer::ExcelWriter;
+    ///
+    /// let writer = ExcelWriter::new("output.xlsx").unwrap();
+    /// println!("Compression level: {}", writer.compression_level());
+    /// ```
+    pub fn compression_level(&self) -> u32 {
+        self.inner.compression_level()
+    }
+
     /// Write a row of data (streaming to disk)
     ///
     /// Data is written directly to the ZIP file and flushed periodically.

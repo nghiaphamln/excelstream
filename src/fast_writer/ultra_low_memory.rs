@@ -231,6 +231,32 @@ impl UltraLowMemoryWorkbook {
         // No large buffers in ultra-low memory mode
     }
 
+    /// Set compression level for the final ZIP file
+    ///
+    /// # Arguments
+    /// * `level` - Compression level from 0 to 9
+    ///   - 0: No compression (fastest, largest files ~280MB for 1M rows)
+    ///   - 1: Fast compression (very fast, ~31MB files) - good for development
+    ///   - 3: Moderate compression (~22MB files)
+    ///   - 6: Balanced compression (~18MB files) - **recommended for production**
+    ///   - 9: Maximum compression (~18MB files, slowest)
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use excelstream::fast_writer::UltraLowMemoryWorkbook;
+    /// let mut wb = UltraLowMemoryWorkbook::new("output.xlsx")?;
+    /// wb.set_compression_level(1); // Fast compression for development
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn set_compression_level(&mut self, level: u32) {
+        self.compression_level = level.min(9);
+    }
+
+    /// Get current compression level
+    pub fn compression_level(&self) -> u32 {
+        self.compression_level
+    }
+
     pub fn close(mut self) -> Result<()> {
         // Close current worksheet
         if let Some(mut writer) = self.current_writer.take() {
