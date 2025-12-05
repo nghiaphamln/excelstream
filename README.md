@@ -6,18 +6,18 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/KSD-CO/excelstream/workflows/Rust/badge.svg)](https://github.com/KSD-CO/excelstream/actions)
 
-> **✨ What's New in v0.6.1:**
+> **✨ What's New in v0.6.2:**
+> - ⬆️ **Upgraded zip crate** - Now using zip 6.0 (latest) with better compression and bug fixes
+> - 🗑️ **Removed deprecated code** - Deleted `fix_xlsx_zip_order()` function (no longer needed)
+> - 💾 **Better Memory** - Improved by ~2%: All methods now use 55 MB (was 56 MB)
+
+
+> **v0.6.1 Features:**
 > - 🐛 **Leading Zero Bug Fixed** - String numbers like "090899" now preserve leading zeros
 > - 🔧 **Improved Type Handling** - `write_row()` treats all values as strings (no auto number detection)
 > - ✅ **Better Type Control** - Use `write_row_typed()` with `CellValue::Int/Float` for numbers
 > - 🧠 **Hybrid SST in All Methods** - Memory optimization applied to all write functions
 > - 💾 **Memory Verified** - All methods stay under 60 MB with realistic data (<80 MB target)
-
-> **v0.6.0 Features:**
-> - 🎨 **Cell Formatting Fixed** - Complete styles.xml implementation with all 14 cell styles working
-> - 🔧 **Unified Architecture** - Removed legacy FastWorkbook, simplified to single UltraLowMemoryWorkbook implementation
-> - 📚 **Improved Examples** - Updated all examples to use consistent ExcelWriter API
-> - 🎯 **Style Support** - All formatting now works: bold, italic, colors, number formats, borders
 
 > **v0.5.1 Features:**
 > - 🗜️ **Compression Level Configuration** - Control ZIP compression levels (0-9) for speed vs size trade-offs
@@ -61,7 +61,7 @@ Add to your `Cargo.toml`:
 excelstream = "0.6"
 ```
 
-**Latest version:** `0.6.1` - Leading zero fix, improved type handling, Hybrid SST in all methods
+**Latest version:** `0.6.2` - Upgraded zip 6.0, removed deprecated code, better memory optimization
 
 ## 🚀 Quick Start
 

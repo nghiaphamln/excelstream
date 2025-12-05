@@ -1,6 +1,6 @@
 [package]
 name = "excelstream"
-version = "0.6.1"
+version = "0.6.2"
 edition = "2021"
 authors = ["Ton That Vu <ttvuhm@gmail.com>"]
 description = "High-performance streaming Excel library - Read/write large XLSX files with memory-efficient streaming"
@@ -24,7 +24,7 @@ calamine = "0.32"
 thiserror = "2.0"
 serde = { version = "1.0", features = ["derive"], optional = true }
 rayon = { version = "1.8", optional = true }
-zip = "0.6"
+zip = "6.0"
 tempfile = "3.8"
 indexmap = "2"
 chrono = { version = "0.4", features = ["clock"] }

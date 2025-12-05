@@ -36,7 +36,7 @@ use crate::error::Result;
 use std::fs::{self, File};
 use std::io::{BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
-use zip::write::{FileOptions, ZipWriter};
+use zip::write::{SimpleFileOptions, ZipWriter};
 use zip::CompressionMethod;
 
 /// Ultra-low memory workbook - writes uncompressed XML first
@@ -604,9 +604,9 @@ impl UltraLowMemoryWorkbook {
             CompressionMethod::Deflated
         };
 
-        let options = FileOptions::default()
+        let options = SimpleFileOptions::default()
             .compression_method(compression_method)
-            .compression_level(Some(self.compression_level as i32));
+            .compression_level(Some(self.compression_level as i64));
 
         // Add files in the correct order per Office Open XML spec
         // [Content_Types].xml MUST be first
@@ -640,7 +640,7 @@ impl UltraLowMemoryWorkbook {
         &self,
         zip: &mut ZipWriter<W>,
         relative_path: &str,
-        options: &FileOptions,
+        options: &SimpleFileOptions,
     ) -> Result<()> {
         let full_path = self.temp_dir.path().join(relative_path);
 

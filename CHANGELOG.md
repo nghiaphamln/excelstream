@@ -5,7 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6.0] - 2024-12-05
+## [0.6.2] - 2024-12-05
+
+### Changed
+- **⬆️ Upgraded Dependencies**: Updated `zip` crate from 0.6 to 6.0
+  - Fixed `flate2` conflict issues on GitHub Actions CI
+  - Updated API: `FileOptions` → `SimpleFileOptions`
+  - Updated compression_level type: `i32` → `i64`
+  - Better compression algorithms and bug fixes
+
+### Removed
+- **🗑️ Removed Deprecated Function**: Deleted `fix_xlsx_zip_order()`
+  - No longer needed as files are written in correct order by default since v0.6.0
+  - Improves performance by eliminating unnecessary reordering step
+  - Reduces code complexity
+
+### Performance
+- **💾 Memory Optimization**: Memory usage improved by ~2%
+  - `write_row()`: 56 MB → 55 MB
+  - `write_row_typed()`: 56 MB → 55 MB
+  - `write_row_styled()`: 56 MB → 55 MB
+  - All methods stay well under 80 MB target ✅
+
+### Fixed
+- **🔧 CI/CD**: Fixed GitHub Actions clippy failures
+  - Resolved `flate2` version conflicts with `zip` crate
+  - Updated workflow to use `--features serde,parallel` instead of `--all-features`
+
+## [0.6.1] - 2024-12-05
 
 ### Fixed
 - **🎨 Cell Formatting Now Working**: Complete styles.xml implementation
