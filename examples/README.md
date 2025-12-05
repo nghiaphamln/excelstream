@@ -1,32 +1,21 @@
-# excelstream Examples# excelstream Examples
+# excelstream Examples
+
+Clean, organized examples demonstrating the excelstream library's capabilities.
 
 
+## 📚 Quick Start Examples
 
-Clean, organized examples demonstrating the excelstream library's capabilities.This directory contains examples demonstrating various features of the excelstream library.
+### 1. basic_read.rs
 
-
-
-## 📚 Quick Start (Beginner)## Quick Start Examples
-
-
-
-### 1. basic_write.rs### 1. basic_read.rs
-
-Create a simple Excel file with headers and data rows.Read a basic Excel file and display its contents.
+Read a basic Excel file and display its contents.
 
 ```bash
-
-cargo run --example basic_write```bash
-
-```cargo run --example basic_read
-
+cargo run --example basic_read
 ```
 
-### 2. basic_read.rs
+### 2. basic_write.rs
 
-Read an Excel file and display its contents.### 2. basic_write.rs
-
-```bashWrite a basic Excel file with header and data rows.
+Write a basic Excel file with header and data rows.
 
 cargo run --example basic_read
 
@@ -253,8 +242,6 @@ cargo run --release --example memory_constrained_write
 ## 🐘 PostgreSQL Integration## PostgreSQL Integration Examples
 
 
-
-See [POSTGRES_EXAMPLES.md](POSTGRES_EXAMPLES.md) and [POSTGRES_QUICKREF.md](POSTGRES_QUICKREF.md) for detailed PostgreSQL documentation.### 13. postgres_to_excel.rs
 
 Export data from PostgreSQL to Excel (basic synchronous version).
 

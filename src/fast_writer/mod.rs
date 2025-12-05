@@ -9,7 +9,6 @@
 pub mod memory;
 pub mod shared_strings;
 pub mod ultra_low_memory;
-pub mod workbook;
 pub mod worksheet;
 pub mod xml_writer;
 
@@ -18,12 +17,6 @@ use std::path::Path;
 
 pub use memory::{create_workbook_auto, create_workbook_with_profile, MemoryProfile};
 pub use ultra_low_memory::UltraLowMemoryWorkbook;
-
-// Re-export UltraLowMemoryWorkbook as FastWorkbook (new default)
-pub use ultra_low_memory::UltraLowMemoryWorkbook as FastWorkbook;
-
-// Keep old FastWorkbook available under different name for backwards compatibility
-pub use workbook::FastWorkbook as LegacyFastWorkbook;
 pub use worksheet::FastWorksheet;
 
 /// Create a fast Excel writer optimized for large datasets
@@ -31,9 +24,9 @@ pub use worksheet::FastWorksheet;
 /// # Examples
 ///
 /// ```no_run
-/// use excelstream::fast_writer::FastWorkbook;
+/// use excelstream::fast_writer::UltraLowMemoryWorkbook;
 ///
-/// let mut workbook = FastWorkbook::new("output.xlsx")?;
+/// let mut workbook = UltraLowMemoryWorkbook::new("output.xlsx")?;
 /// workbook.add_worksheet("Sheet1")?;
 ///
 /// workbook.write_row(&["Name", "Age", "Email"])?;
@@ -42,6 +35,6 @@ pub use worksheet::FastWorksheet;
 /// workbook.close()?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-pub fn create_fast_writer<P: AsRef<Path>>(path: P) -> Result<FastWorkbook> {
-    FastWorkbook::new(path)
+pub fn create_fast_writer<P: AsRef<Path>>(path: P) -> Result<UltraLowMemoryWorkbook> {
+    UltraLowMemoryWorkbook::new(path)
 }

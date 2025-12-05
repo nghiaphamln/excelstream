@@ -6,28 +6,26 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/KSD-CO/excelstream/workflows/Rust/badge.svg)](https://github.com/KSD-CO/excelstream/actions)
 
-> **✨ What's New in v0.5.1:**
+> **✨ What's New in v0.6.0:**
+> - 🎨 **Cell Formatting Fixed** - Complete styles.xml implementation with all 14 cell styles working
+> - 🔧 **Unified Architecture** - Removed legacy FastWorkbook, simplified to single UltraLowMemoryWorkbook implementation
+> - 🔒 **Security Improvements** - Removed hardcoded credentials, added .env.example for safe configuration
+> - 📚 **Improved Examples** - Updated all examples to use consistent ExcelWriter API
+> - 🎯 **Style Support** - All formatting now works: bold, italic, colors, number formats, borders
+
+> **v0.5.1 Features:**
 > - 🗜️ **Compression Level Configuration** - Control ZIP compression levels (0-9) for speed vs size trade-offs
 > - ⚙️ **Flexible API** - Set compression at workbook creation or anytime during writing
 > - ⚡ **Fast Mode** - Level 1 compression: 2x faster, suitable for development and testing
 > - 📦 **Balanced Mode** - Level 3 compression: Good balance between speed and file size
 > - 💾 **Production Mode** - Level 6 compression (default): Best file size for production exports
-> - 🔧 **Memory Optimization** - Updated PostgreSQL streaming with optimized batch sizes (500 rows)
+> - 🔧 **Memory Optimization** - PostgreSQL streaming with optimized batch sizes (500 rows)
 
 > **v0.5.0 Features:**
 > - 🚀 **Hybrid SST Optimization** - Intelligent selective deduplication for optimal memory usage
 > - 💾 **Ultra-Low Memory** - 15-25 MB for 1M rows (was 125 MB), 89% reduction!
 > - ⚡ **58% Faster** - 25K+ rows/sec with hybrid SST strategy
 > - 🎯 **Smart Detection** - Numbers inline, long strings inline, only short repeated strings deduplicated
-> - 📊 **Handles Complex Data** - 50+ columns with mixed types (numbers, dates, UUIDs, text)
-> - 🧠 **Memory Cap** - SST limited to 100k unique strings, graceful degradation beyond limit
-
-> **v0.4.0 Features:**
-> - 📏 **Column Width & Row Height** - Customize column widths and row heights for perfect formatting!
-> - 🎨 **Cell Formatting** - 14 predefined styles: bold, italic, highlights, borders, number formats!
-> - 🎨 **Easy Styling API** - `write_header_bold()`, `write_row_styled()`, `write_row_with_style()`
-> - 💰 **Number Formats** - Currency, percentage, decimal, integer formats
-> - 📅 **Date Formats** - MM/DD/YYYY and timestamp formats
 
 ## ✨ Features
 
@@ -36,7 +34,7 @@
 - ⚡ **High Performance** - 25K+ rows/sec with hybrid SST optimization (58% faster!)
 - 🧠 **Hybrid SST** - Intelligent deduplication: numbers inline, long strings inline, only short repeated strings deduplicated
 - 🗜️ **Compression Control** - Configure ZIP compression levels (0-9) for speed vs size optimization
-- 🎨 **Cell Formatting** - 14 predefined styles (bold, currency, %, highlights, borders)
+- 🎨 **Cell Formatting** - 14 predefined styles (bold, currency, %, highlights, borders) - **WORKING!**
 - 📏 **Column Width & Row Height** - Customize column widths and row heights
 - 📐 **Formula Support** - Write Excel formulas (=SUM, =AVERAGE, =IF, etc.)
 - 🎯 **Typed Values** - Strong typing with Int, Float, Bool, DateTime, Formula
@@ -45,7 +43,6 @@
 - 📊 **Multi-format Support** - Read XLSX, XLS, ODS formats
 - 🔒 **Type-safe** - Leverage Rust's type system for safety
 - 📝 **Multi-sheet** - Support multiple sheets in one workbook
-- 🗄️ **Database Export** - PostgreSQL integration examples
 - 🪟 **Cross-Platform** - Works perfectly on Windows, Linux, and macOS
 - ✅ **Production Ready** - 50+ tests, CI/CD, zero unsafe code
 
@@ -55,10 +52,10 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-excelstream = "0.5"
+excelstream = "0.6"
 ```
 
-**Latest version:** `0.5.1` - Added compression level configuration (0-9) for speed vs size optimization
+**Latest version:** `0.6.0` - Cell formatting fixed, unified architecture, improved security
 
 ## 🚀 Quick Start
 

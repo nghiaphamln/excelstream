@@ -4,7 +4,7 @@
 //! Data is written directly to disk as you call write_row(), not kept in memory.
 
 use crate::error::Result;
-use crate::fast_writer::FastWorkbook;
+use crate::fast_writer::UltraLowMemoryWorkbook;
 use crate::types::{CellStyle, CellValue};
 use std::path::Path;
 
@@ -31,7 +31,7 @@ use std::path::Path;
 /// writer.save().unwrap();
 /// ```
 pub struct ExcelWriter {
-    inner: FastWorkbook,
+    inner: UltraLowMemoryWorkbook,
     current_sheet_name: String,
     current_row: u32,
 }
@@ -49,7 +49,7 @@ impl ExcelWriter {
     /// writer.save().unwrap();
     /// ```
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let mut inner = FastWorkbook::new(path)?;
+        let mut inner = UltraLowMemoryWorkbook::new(path)?;
         inner.add_worksheet("Sheet1")?;
 
         Ok(ExcelWriter {
@@ -80,7 +80,7 @@ impl ExcelWriter {
     /// writer.save().unwrap();
     /// ```
     pub fn with_compression<P: AsRef<Path>>(path: P, compression_level: u32) -> Result<Self> {
-        let mut inner = FastWorkbook::with_compression(path, compression_level)?;
+        let mut inner = UltraLowMemoryWorkbook::with_compression(path, compression_level)?;
         inner.add_worksheet("Sheet1")?;
 
         Ok(ExcelWriter {
@@ -505,7 +505,7 @@ impl ExcelWriterBuilder {
 
     /// Build the writer
     pub fn build(self) -> Result<ExcelWriter> {
-        let mut inner = FastWorkbook::new(&self.path)?;
+        let mut inner = UltraLowMemoryWorkbook::new(&self.path)?;
 
         let sheet_name = self
             .default_sheet_name

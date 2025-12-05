@@ -9,7 +9,7 @@
 //! - Sheet3: rows 2,000,001-3,000,000
 //! - ... and so on
 
-use excelstream::fast_writer::FastWorkbook;
+use excelstream::writer::ExcelWriter;
 use std::time::Instant;
 
 const EXCEL_MAX_ROWS: usize = 1_048_576; // Excel's hard limit
@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Starting multi-sheet write...");
     let start = Instant::now();
 
-    let mut workbook = FastWorkbook::new("test_10m_multi_sheet.xlsx")?;
+    let mut writer = ExcelWriter::new("test_10m_multi_sheet.xlsx")?;
 
     // Headers for all sheets
     let headers = vec![
@@ -78,8 +78,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut current_sheet = 0;
 
     // Create first sheet
-    workbook.add_worksheet(&format!("Data_Part_{}", current_sheet + 1))?;
-    workbook.write_row(&headers[..NUM_COLS])?;
+    writer.add_sheet(&format!("Data_Part_{}", current_sheet + 1))?;
+    writer.write_row(&headers[..NUM_COLS])?;
     let mut rows_in_current_sheet = 1; // Header counts as 1 row
 
     println!("Sheet 1: Starting...");
@@ -94,15 +94,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
             println!("Sheet {}: Starting...", current_sheet + 1);
 
-            workbook.add_worksheet(&format!("Data_Part_{}", current_sheet + 1))?;
-            workbook.write_row(&headers[..NUM_COLS])?;
+            writer.add_sheet(&format!("Data_Part_{}", current_sheet + 1))?;
+            writer.write_row(&headers[..NUM_COLS])?;
             rows_in_current_sheet = 1; // Reset counter (header)
         }
 
         // Generate and write row
         let row = generate_row_data(row_num, NUM_COLS);
         let row_refs: Vec<&str> = row.iter().map(|s| s.as_str()).collect();
-        workbook.write_row(&row_refs)?;
+        writer.write_row(&row_refs)?;
         rows_in_current_sheet += 1;
 
         // Progress indicator every 100K rows
@@ -126,8 +126,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         rows_in_current_sheet
     );
 
-    println!("\nClosing workbook...");
-    workbook.close()?;
+    println!("\nSaving workbook...");
+    writer.save()?;
 
     let duration = start.elapsed();
     let speed = TOTAL_ROWS as f64 / duration.as_secs_f64();

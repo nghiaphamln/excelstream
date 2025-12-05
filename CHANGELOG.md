@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2024-12-05
+
+### Fixed
+- **🎨 Cell Formatting Now Working**: Complete styles.xml implementation
+  - Fixed empty styles.xml (was 100 bytes stub, now complete 2651 bytes)
+  - Implemented full `write_row_styled()` with proper style attributes (`s="X"`)
+  - All 14 CellStyle variants working: HeaderBold, NumberInteger, NumberDecimal, NumberCurrency, NumberPercentage, DateDefault, DateTimestamp, TextBold, TextItalic, HighlightYellow, HighlightGreen, HighlightRed, BorderThin
+  - Standard ECMA-376 format IDs used (3, 4, 5, 9, 14, 22)
+  - Complete fonts, fills, borders, and cellXfs definitions
+
+### Changed
+- **🔧 Unified Architecture**: Removed legacy FastWorkbook
+  - Deleted `src/fast_writer/workbook.rs` (~974 lines)
+  - Unified on single `UltraLowMemoryWorkbook` implementation
+  - Updated all internal references and examples
+  - Simplified API surface - less confusion
+  - All 18 library tests passing after cleanup
+
+### Security
+- **🔒 Security Improvements**: Removed hardcoded credentials
+  - Removed database connection strings from `postgres_streaming.rs`
+  - Added `.env.example` with configuration templates
+  - Updated `.gitignore` to prevent committing `.env` files
+  - Updated documentation with security warnings
+  - All PostgreSQL examples now require `DATABASE_URL` environment variable
+
+### Improved
+- **📚 Better Examples**: Consistent API usage
+  - Updated `large_dataset_multi_sheet.rs` to use `ExcelWriter` instead of low-level API
+  - Fixed `memory_constrained_write.rs` for new architecture
+  - Updated `writers_comparison.rs` to reflect UltraLowMemoryWorkbook
+  - All examples use consistent `ExcelWriter` API with `add_sheet()` method
+  - Added security warnings to example documentation
+
+### Technical Details
+- Complete styles.xml with 3 fonts, 5 fills, 2 borders, 14 cellXfs
+- Style indices (0-13) properly mapped to cell attributes
+- Memory functions updated for UltraLowMemoryWorkbook compatibility
+- No performance regression - all optimizations preserved
+
 ## [0.5.0] - 2024-12-04
 
 ### Added

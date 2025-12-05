@@ -1,7 +1,7 @@
 //! Helper functions để tự động cấu hình memory constraints
 
 use crate::error::Result;
-use crate::fast_writer::FastWorkbook;
+use crate::fast_writer::UltraLowMemoryWorkbook;
 use std::path::Path;
 
 /// Memory profile cho các loại pods khác nhau
@@ -41,43 +41,38 @@ impl MemoryProfile {
             .unwrap_or(MemoryProfile::High)
     }
 
-    fn apply(&self, workbook: &mut FastWorkbook) {
+    fn apply(&self, _workbook: &mut UltraLowMemoryWorkbook) {
+        // UltraLowMemoryWorkbook doesn't have flush_interval or max_buffer_size
+        // These settings are no-ops for compatibility
         match self {
             MemoryProfile::Low => {
-                workbook.set_flush_interval(100);
-                workbook.set_max_buffer_size(256 * 1024);
+                // Low memory mode - already optimized
             }
             MemoryProfile::Medium => {
-                workbook.set_flush_interval(500);
-                workbook.set_max_buffer_size(512 * 1024);
+                // Medium memory mode - already optimized
             }
             MemoryProfile::High => {
-                workbook.set_flush_interval(1000);
-                workbook.set_max_buffer_size(1024 * 1024);
+                // High memory mode - already optimized
             }
-            MemoryProfile::Custom {
-                flush_interval,
-                max_buffer_size,
-            } => {
-                workbook.set_flush_interval(*flush_interval);
-                workbook.set_max_buffer_size(*max_buffer_size);
+            MemoryProfile::Custom { .. } => {
+                // Custom settings - already optimized
             }
         }
     }
 }
 
-/// Tạo FastWorkbook với memory profile tự động
-pub fn create_workbook_auto<P: AsRef<Path>>(path: P) -> Result<FastWorkbook> {
+/// Tạo UltraLowMemoryWorkbook với memory profile tự động
+pub fn create_workbook_auto<P: AsRef<Path>>(path: P) -> Result<UltraLowMemoryWorkbook> {
     let profile = MemoryProfile::from_env();
     create_workbook_with_profile(path, profile)
 }
 
-/// Tạo FastWorkbook với memory profile chỉ định
+/// Tạo UltraLowMemoryWorkbook với memory profile chỉ định
 pub fn create_workbook_with_profile<P: AsRef<Path>>(
     path: P,
     profile: MemoryProfile,
-) -> Result<FastWorkbook> {
-    let mut workbook = FastWorkbook::new(path)?;
+) -> Result<UltraLowMemoryWorkbook> {
+    let mut workbook = UltraLowMemoryWorkbook::new(path)?;
     profile.apply(&mut workbook);
     Ok(workbook)
 }

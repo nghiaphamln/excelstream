@@ -200,13 +200,97 @@ impl UltraLowMemoryWorkbook {
         Ok(())
     }
 
-    /// Write styled row (compatibility method - styling not implemented yet)
-    pub fn write_row_styled(&mut self, _cells: &[crate::types::StyledCell]) -> Result<()> {
-        // TODO: Implement styling support
-        // For now, extract values and write as plain text
-        let values: Vec<String> = _cells.iter().map(|c| c.value.to_string()).collect();
-        let str_refs: Vec<&str> = values.iter().map(|s| s.as_str()).collect();
-        self.write_row(&str_refs)
+    /// Write styled row with cell formatting
+    pub fn write_row_styled(&mut self, cells: &[crate::types::StyledCell]) -> Result<()> {
+        use crate::types::CellValue;
+
+        if self.current_writer.is_none() {
+            return Err(crate::error::ExcelError::WriteError(
+                "No active worksheet. Call add_worksheet() first.".to_string(),
+            ));
+        }
+
+        self.current_row += 1;
+        let row_num = self.current_row;
+
+        let writer = self.current_writer.as_mut().unwrap();
+
+        // Write row start tag
+        write!(writer, "<row r=\"{}\"", row_num)?;
+        if !cells.is_empty() {
+            write!(writer, " spans=\"1:{}\"", cells.len())?;
+        }
+        write!(writer, ">")?;
+
+        // Write each cell with styling
+        for (col_idx, cell) in cells.iter().enumerate() {
+            let col_num = (col_idx + 1) as u32;
+            let col_letter = Self::col_to_letter(col_num);
+            let cell_ref = format!("{}{}", col_letter, row_num);
+            let style_index = cell.style.index();
+
+            match &cell.value {
+                CellValue::Empty => {
+                    // Skip empty cells
+                    continue;
+                }
+                CellValue::String(s) => {
+                    let string_index = self.shared_strings.add_string(s);
+                    write!(writer, "<c r=\"{}\"", cell_ref)?;
+                    if style_index > 0 {
+                        write!(writer, " s=\"{}\"", style_index)?;
+                    }
+                    write!(writer, " t=\"s\"><v>{}</v></c>", string_index)?;
+                }
+                CellValue::Int(n) => {
+                    write!(writer, "<c r=\"{}\"", cell_ref)?;
+                    if style_index > 0 {
+                        write!(writer, " s=\"{}\"", style_index)?;
+                    }
+                    write!(writer, "><v>{}</v></c>", n)?;
+                }
+                CellValue::Float(f) => {
+                    write!(writer, "<c r=\"{}\"", cell_ref)?;
+                    if style_index > 0 {
+                        write!(writer, " s=\"{}\"", style_index)?;
+                    }
+                    write!(writer, "><v>{}</v></c>", f)?;
+                }
+                CellValue::Bool(b) => {
+                    write!(writer, "<c r=\"{}\"", cell_ref)?;
+                    if style_index > 0 {
+                        write!(writer, " s=\"{}\"", style_index)?;
+                    }
+                    write!(writer, " t=\"b\"><v>{}</v></c>", if *b { 1 } else { 0 })?;
+                }
+                CellValue::Formula(formula) => {
+                    write!(writer, "<c r=\"{}\"", cell_ref)?;
+                    if style_index > 0 {
+                        write!(writer, " s=\"{}\"", style_index)?;
+                    }
+                    write!(writer, "><f>{}</f></c>", formula)?;
+                }
+                CellValue::DateTime(_) | CellValue::Error(_) => {
+                    let s = format!("{:?}", cell.value);
+                    let string_index = self.shared_strings.add_string(&s);
+                    write!(writer, "<c r=\"{}\"", cell_ref)?;
+                    if style_index > 0 {
+                        write!(writer, " s=\"{}\"", style_index)?;
+                    }
+                    write!(writer, " t=\"s\"><v>{}</v></c>", string_index)?;
+                }
+            }
+        }
+
+        // Close row tag
+        write!(writer, "</row>")?;
+
+        // Flush periodically (every 1000 rows)
+        if self.current_row % 1000 == 0 {
+            writer.flush()?;
+        }
+
+        Ok(())
     }
 
     /// Set column width (no-op for compatibility)
@@ -356,10 +440,73 @@ impl UltraLowMemoryWorkbook {
         write!(f, "</sheets></workbook>")?;
         f.flush()?;
 
-        // Write minimal styles.xml
+        // Write complete styles.xml with all 14 CellStyle variants
         let path = self.temp_dir.path().join("xl/styles.xml");
         let mut f = File::create(path)?;
-        write!(f, "<?xml version=\"1.0\"?><styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"/>")?;
+        write!(
+            f,
+            "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+        )?;
+        write!(
+            f,
+            "<styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">"
+        )?;
+        // Fonts: 0=normal, 1=bold, 2=italic
+        write!(f, "<fonts count=\"3\">")?;
+        write!(f, "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Calibri\"/><family val=\"2\"/><scheme val=\"minor\"/></font>")?;
+        write!(f, "<font><b/><sz val=\"11\"/><color theme=\"1\"/><name val=\"Calibri\"/><family val=\"2\"/><scheme val=\"minor\"/></font>")?;
+        write!(f, "<font><i/><sz val=\"11\"/><color theme=\"1\"/><name val=\"Calibri\"/><family val=\"2\"/><scheme val=\"minor\"/></font>")?;
+        write!(f, "</fonts>")?;
+        // Fills: 0=none, 1=gray125, 2=yellow, 3=green, 4=red
+        write!(f, "<fills count=\"5\">")?;
+        write!(f, "<fill><patternFill patternType=\"none\"/></fill>")?;
+        write!(f, "<fill><patternFill patternType=\"gray125\"/></fill>")?;
+        write!(f, "<fill><patternFill patternType=\"solid\"><fgColor rgb=\"FFFFFF00\"/><bgColor indexed=\"64\"/></patternFill></fill>")?;
+        write!(f, "<fill><patternFill patternType=\"solid\"><fgColor rgb=\"FF00FF00\"/><bgColor indexed=\"64\"/></patternFill></fill>")?;
+        write!(f, "<fill><patternFill patternType=\"solid\"><fgColor rgb=\"FFFF0000\"/><bgColor indexed=\"64\"/></patternFill></fill>")?;
+        write!(f, "</fills>")?;
+        // Borders: 0=none, 1=thin
+        write!(f, "<borders count=\"2\">")?;
+        write!(
+            f,
+            "<border><left/><right/><top/><bottom/><diagonal/></border>"
+        )?;
+        write!(f, "<border><left style=\"thin\"><color auto=\"1\"/></left><right style=\"thin\"><color auto=\"1\"/></right><top style=\"thin\"><color auto=\"1\"/></top><bottom style=\"thin\"><color auto=\"1\"/></bottom><diagonal/></border>")?;
+        write!(f, "</borders>")?;
+        // cellStyleXfs
+        write!(f, "<cellStyleXfs count=\"1\">")?;
+        write!(
+            f,
+            "<xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/>"
+        )?;
+        write!(f, "</cellStyleXfs>")?;
+        // cellXfs - 14 styles matching CellStyle enum
+        write!(f, "<cellXfs count=\"14\">")?;
+        write!(
+            f,
+            "<xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\"/>"
+        )?; // 0: Default
+        write!(f, "<xf numFmtId=\"0\" fontId=\"1\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyFont=\"1\"/>")?; // 1: HeaderBold
+        write!(f, "<xf numFmtId=\"3\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/>")?; // 2: NumberInteger
+        write!(f, "<xf numFmtId=\"4\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/>")?; // 3: NumberDecimal
+        write!(f, "<xf numFmtId=\"5\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/>")?; // 4: NumberCurrency
+        write!(f, "<xf numFmtId=\"9\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/>")?; // 5: NumberPercentage
+        write!(f, "<xf numFmtId=\"14\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/>")?; // 6: DateDefault
+        write!(f, "<xf numFmtId=\"22\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/>")?; // 7: DateTimestamp
+        write!(f, "<xf numFmtId=\"0\" fontId=\"1\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyFont=\"1\"/>")?; // 8: TextBold
+        write!(f, "<xf numFmtId=\"0\" fontId=\"2\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyFont=\"1\"/>")?; // 9: TextItalic
+        write!(f, "<xf numFmtId=\"0\" fontId=\"0\" fillId=\"2\" borderId=\"0\" xfId=\"0\" applyFill=\"1\"/>")?; // 10: HighlightYellow
+        write!(f, "<xf numFmtId=\"0\" fontId=\"0\" fillId=\"3\" borderId=\"0\" xfId=\"0\" applyFill=\"1\"/>")?; // 11: HighlightGreen
+        write!(f, "<xf numFmtId=\"0\" fontId=\"0\" fillId=\"4\" borderId=\"0\" xfId=\"0\" applyFill=\"1\"/>")?; // 12: HighlightRed
+        write!(f, "<xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"1\" xfId=\"0\" applyBorder=\"1\"/>")?; // 13: BorderThin
+        write!(f, "</cellXfs>")?;
+        // cellStyles
+        write!(f, "<cellStyles count=\"1\">")?;
+        write!(f, "<cellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\"/>")?;
+        write!(f, "</cellStyles>")?;
+        write!(f, "<dxfs count=\"0\"/>")?;
+        write!(f, "<tableStyles count=\"0\" defaultTableStyle=\"TableStyleMedium9\" defaultPivotStyle=\"PivotStyleLight16\"/>")?;
+        write!(f, "</styleSheet>")?;
         f.flush()?;
 
         // Write _rels/.rels

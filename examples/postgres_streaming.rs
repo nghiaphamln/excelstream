@@ -18,10 +18,9 @@ use std::time::{Duration, Instant};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Memory-Efficient PostgreSQL to Excel Export ===\n");
 
-    // Configuration
-    let connection_string = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
-        "postgres://u_e_invoice:abcd%401234@10.98.98.100:5432/e_invoice".to_string()
-    });
+    // Configuration - IMPORTANT: Set DATABASE_URL environment variable
+    let connection_string = std::env::var("DATABASE_URL")
+        .expect("DATABASE_URL environment variable must be set. Example: postgres://username:password@host:port/database");
 
     let output_file = "e_invoice_export.xlsx";
     // MEMORY OPTIMIZATION: Reduced batch size from 5000 to 500 rows

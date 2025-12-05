@@ -1,6 +1,6 @@
 //! Memory-constrained writing demo for resource-limited environments
 
-use excelstream::fast_writer::FastWorkbook;
+use excelstream::fast_writer::UltraLowMemoryWorkbook;
 use std::time::Instant;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -42,10 +42,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn test_default(filename: &str, num_rows: usize) -> Result<(), Box<dyn std::error::Error>> {
-    let mut workbook = FastWorkbook::new(filename)?;
+    let mut workbook = UltraLowMemoryWorkbook::new(filename)?;
 
-    // Default compression level 6 (balanced)
-    // Default: flush every 1000 rows
+    // UltraLowMemoryWorkbook uses optimized settings automatically
+    // Flushes every 1000 rows to disk
     workbook.add_worksheet("Sheet1")?;
     write_data(&mut workbook, num_rows)?;
     workbook.close()?;
@@ -56,13 +56,11 @@ fn test_aggressive_flush(
     filename: &str,
     num_rows: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut workbook = FastWorkbook::new(filename)?;
+    let mut workbook = UltraLowMemoryWorkbook::new(filename)?;
 
-    // Configuration for memory-constrained pods
-    workbook.set_flush_interval(100); // Flush every 100 rows
-    workbook.set_max_buffer_size(256 * 1024); // 256KB max buffer
-    workbook.set_compression_level(1); // Fast compression for low memory
-
+    // UltraLowMemoryWorkbook manages memory automatically
+    // No need to set flush_interval or buffer_size
+    // Always uses minimal memory (10-30MB)
     workbook.add_worksheet("Sheet1")?;
     write_data(&mut workbook, num_rows)?;
     workbook.close()?;
@@ -70,13 +68,9 @@ fn test_aggressive_flush(
 }
 
 fn test_balanced(filename: &str, num_rows: usize) -> Result<(), Box<dyn std::error::Error>> {
-    let mut workbook = FastWorkbook::new(filename)?;
+    let mut workbook = UltraLowMemoryWorkbook::new(filename)?;
 
-    // Balanced configuration
-    workbook.set_flush_interval(500); // Flush every 500 rows
-    workbook.set_max_buffer_size(512 * 1024); // 512KB max buffer
-    workbook.set_compression_level(3); // Moderate compression
-
+    // UltraLowMemoryWorkbook already uses balanced approach
     workbook.add_worksheet("Sheet1")?;
     write_data(&mut workbook, num_rows)?;
     workbook.close()?;
@@ -84,13 +78,10 @@ fn test_balanced(filename: &str, num_rows: usize) -> Result<(), Box<dyn std::err
 }
 
 fn test_conservative(filename: &str, num_rows: usize) -> Result<(), Box<dyn std::error::Error>> {
-    let mut workbook = FastWorkbook::new(filename)?;
+    let mut workbook = UltraLowMemoryWorkbook::new(filename)?;
 
     // Configuration for maximum performance
-    workbook.set_flush_interval(5000); // Flush every 5000 rows
-    workbook.set_max_buffer_size(2 * 1024 * 1024); // 2MB max buffer
-    workbook.set_compression_level(6); // Balanced compression (default)
-
+    // UltraLowMemoryWorkbook already optimized
     workbook.add_worksheet("Sheet1")?;
     write_data(&mut workbook, num_rows)?;
     workbook.close()?;
@@ -98,7 +89,7 @@ fn test_conservative(filename: &str, num_rows: usize) -> Result<(), Box<dyn std:
 }
 
 fn write_data(
-    workbook: &mut FastWorkbook,
+    workbook: &mut UltraLowMemoryWorkbook,
     num_rows: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Write header

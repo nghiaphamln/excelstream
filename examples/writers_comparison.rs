@@ -4,9 +4,9 @@
 //! 1. ExcelWriter with write_row() - String-based (standard wrapper)
 //! 2. ExcelWriter with write_row_typed() - Typed values
 //! 3. ExcelWriter with write_row_styled() - Styled cells (v0.3.0+)
-//! 4. FastWorkbook - Custom implementation (optimized for large datasets)
+//! 4. UltraLowMemoryWorkbook - Direct low-level API (optimized for large datasets)
 
-use excelstream::fast_writer::FastWorkbook;
+use excelstream::fast_writer::UltraLowMemoryWorkbook;
 use excelstream::types::{CellStyle, CellValue};
 use excelstream::writer::ExcelWriter;
 use std::time::Instant;
@@ -76,10 +76,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Time: {:?}", duration3);
     println!("   Speed: {:.0} rows/sec\n", speed3);
 
-    // Test 4: FastWorkbook - Custom implementation
-    println!("4. FastWorkbook - Optimized implementation:");
+    // Test 4: UltraLowMemoryWorkbook - Direct low-level API
+    println!("4. UltraLowMemoryWorkbook - Direct low-level API:");
     let start = Instant::now();
-    test_fast_workbook("test_fast.xlsx", NUM_ROWS, NUM_COLS)?;
+    test_ultra_low_memory("test_ultra.xlsx", NUM_ROWS, NUM_COLS)?;
     let duration4 = start.elapsed();
     let speed4 = NUM_ROWS as f64 / duration4.as_secs_f64();
     println!("   Time: {:?}", duration4);
@@ -103,7 +103,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         speed3 / speed1
     );
     println!(
-        "FastWorkbook:                  {:.0} rows/sec ({:.2}x)",
+        "UltraLowMemoryWorkbook:        {:.0} rows/sec ({:.2}x)",
         speed4,
         speed4 / speed1
     );
@@ -132,7 +132,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("  Same speed");
     }
 
-    println!("\nFastWorkbook:");
+    println!("\nUltraLowMemoryWorkbook:");
     if diff4 > 0.0 {
         println!("  +{:.0}% faster ⚡", diff4);
     } else {
@@ -142,7 +142,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("=== Feature Comparison ===");
     println!("┌─────────────────────┬──────────────┬──────────────┬──────────────┬──────────────┐");
-    println!("│ Feature             │ write_row()  │ typed()      │ styled()     │ FastWorkbook │");
+    println!("│ Feature             │ write_row()  │ typed()      │ styled()     │ UltraLowMem  │");
     println!("├─────────────────────┼──────────────┼──────────────┼──────────────┼──────────────┤");
     println!(
         "│ Speed               │ Baseline     │ {:<12} │ {:<12} │ {:<12} │",
@@ -186,17 +186,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         speed3, diff3
     );
     println!();
-    println!("✅ Use FastWorkbook direct when:");
+    println!("✅ Use UltraLowMemoryWorkbook direct when:");
     println!("   - Have data already as &str (avoid String allocation)");
     println!("   - Need lowest-level control");
     println!("   - Building custom abstractions");
     println!("   - Memory-constrained environments");
     println!("   - Note: This test shows slower due to Vec<String>→Vec<&str> conversion");
-    println!("   - In real usage with &str data, FastWorkbook is fastest!");
+    println!("   - In real usage with &str data, UltraLowMemoryWorkbook is fastest!");
     println!("   - Performance: {:.0} rows/sec ({:+.0}%)", speed4, diff4);
     println!();
     println!("💡 Key Insight:");
-    println!("   - ExcelWriter already uses FastWorkbook internally!");
+    println!("   - ExcelWriter already uses UltraLowMemoryWorkbook internally!");
     println!("   - write_row_styled() is fastest because it avoids string conversions");
     println!("   - Use styled() for best performance + features");
 
@@ -366,12 +366,12 @@ fn test_write_row_styled(
     Ok(())
 }
 
-fn test_fast_workbook(
+fn test_ultra_low_memory(
     filename: &str,
     num_rows: usize,
     num_cols: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut workbook = FastWorkbook::new(filename)?;
+    let mut workbook = UltraLowMemoryWorkbook::new(filename)?;
     workbook.add_worksheet("Sheet1")?;
 
     // Write header

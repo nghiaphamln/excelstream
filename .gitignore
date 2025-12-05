@@ -6,6 +6,10 @@
 *.swo
 *~
 
+# Environment variables (NEVER commit credentials!)
+.env
+.env.local
+
 # IDE
 .idea
 .vscode
