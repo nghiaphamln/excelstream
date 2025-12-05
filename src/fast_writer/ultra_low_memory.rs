@@ -165,17 +165,14 @@ impl UltraLowMemoryWorkbook {
                 .extend_from_slice(row_num.to_string().as_bytes());
 
             // Hybrid SST Strategy:
-            // 1. Numbers → inline as number type (no SST)
-            // 2. Long strings (>50 chars) → inline (usually unique)
-            // 3. Short repeating strings → SST (dedupe)
-            // 4. If SST full (>100k) → inline
+            // Treat all values as STRINGS (no auto number detection)
+            // - Long strings (>50 chars) → inline (usually unique)
+            // - Short repeating strings → SST (dedupe)
+            // - If SST full (>100k) → inline
+            //
+            // For numbers, use write_row_typed() with CellValue::Int/Float
 
-            if let Ok(_num) = value.parse::<f64>() {
-                // Numbers: use number type (more efficient, no SST)
-                self.xml_buffer.extend_from_slice(b"\" t=\"n\"><v>");
-                self.xml_buffer.extend_from_slice(value.as_bytes());
-                self.xml_buffer.extend_from_slice(b"</v></c>");
-            } else if value.len() > 50 || self.shared_strings.count() >= 100_000 {
+            if value.len() > 50 || self.shared_strings.count() >= 100_000 {
                 // Long strings or SST full: use inline string
                 self.xml_buffer
                     .extend_from_slice(b"\" t=\"inlineStr\"><is><t>");
@@ -235,12 +232,25 @@ impl UltraLowMemoryWorkbook {
                     continue;
                 }
                 CellValue::String(s) => {
-                    let string_index = self.shared_strings.add_string(s);
                     write!(writer, "<c r=\"{}\"", cell_ref)?;
                     if style_index > 0 {
                         write!(writer, " s=\"{}\"", style_index)?;
                     }
-                    write!(writer, " t=\"s\"><v>{}</v></c>", string_index)?;
+
+                    // Hybrid SST Strategy for memory optimization:
+                    // 1. Long strings (>50 chars) → inline (save SST memory)
+                    // 2. SST full (>100k) → inline (prevent memory leak)
+                    // 3. Short repeating strings → SST (dedupe)
+                    if s.len() > 50 || self.shared_strings.count() >= 100_000 {
+                        // Use inline string
+                        write!(writer, " t=\"inlineStr\"><is><t>")?;
+                        Self::write_escaped_to_writer(writer, s)?;
+                        write!(writer, "</t></is></c>")?;
+                    } else {
+                        // Use shared strings
+                        let string_index = self.shared_strings.add_string(s);
+                        write!(writer, " t=\"s\"><v>{}</v></c>", string_index)?;
+                    }
                 }
                 CellValue::Int(n) => {
                     write!(writer, "<c r=\"{}\"", cell_ref)?;
@@ -272,12 +282,20 @@ impl UltraLowMemoryWorkbook {
                 }
                 CellValue::DateTime(_) | CellValue::Error(_) => {
                     let s = format!("{:?}", cell.value);
-                    let string_index = self.shared_strings.add_string(&s);
                     write!(writer, "<c r=\"{}\"", cell_ref)?;
                     if style_index > 0 {
                         write!(writer, " s=\"{}\"", style_index)?;
                     }
-                    write!(writer, " t=\"s\"><v>{}</v></c>", string_index)?;
+
+                    // Hybrid SST Strategy (same as String)
+                    if s.len() > 50 || self.shared_strings.count() >= 100_000 {
+                        write!(writer, " t=\"inlineStr\"><is><t>")?;
+                        Self::write_escaped_to_writer(writer, &s)?;
+                        write!(writer, "</t></is></c>")?;
+                    } else {
+                        let string_index = self.shared_strings.add_string(&s);
+                        write!(writer, " t=\"s\"><v>{}</v></c>", string_index)?;
+                    }
                 }
             }
         }
@@ -651,5 +669,22 @@ impl UltraLowMemoryWorkbook {
             n = (n - 1) / 26;
         }
         result
+    }
+
+    /// Write XML-escaped string to writer
+    ///
+    /// Escapes: < > & " '
+    fn write_escaped_to_writer<W: Write>(writer: &mut W, s: &str) -> Result<()> {
+        for c in s.chars() {
+            match c {
+                '<' => writer.write_all(b"&lt;")?,
+                '>' => writer.write_all(b"&gt;")?,
+                '&' => writer.write_all(b"&amp;")?,
+                '"' => writer.write_all(b"&quot;")?,
+                '\'' => writer.write_all(b"&apos;")?,
+                _ => write!(writer, "{}", c)?,
+            }
+        }
+        Ok(())
     }
 }

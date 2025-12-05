@@ -207,21 +207,15 @@ impl ExcelWriter {
     /// writer.save().unwrap();
     /// ```
     pub fn write_row_typed(&mut self, cells: &[CellValue]) -> Result<()> {
-        let values: Vec<String> = cells
+        use crate::types::StyledCell;
+
+        // Convert CellValue to StyledCell with default style to preserve types
+        let styled_cells: Vec<StyledCell> = cells
             .iter()
-            .map(|cell| match cell {
-                CellValue::Empty => String::new(),
-                CellValue::String(s) => s.clone(),
-                CellValue::Int(i) => i.to_string(),
-                CellValue::Float(f) => f.to_string(),
-                CellValue::Bool(b) => if *b { "TRUE" } else { "FALSE" }.to_string(),
-                CellValue::DateTime(d) => d.to_string(),
-                CellValue::Error(e) => format!("ERROR: {}", e),
-                CellValue::Formula(f) => f.clone(),
-            })
+            .map(|cell| StyledCell::new(cell.clone(), CellStyle::Default))
             .collect();
-        let refs: Vec<&str> = values.iter().map(|s| s.as_str()).collect();
-        self.inner.write_row(&refs)?;
+
+        self.inner.write_row_styled(&styled_cells)?;
         self.current_row += 1;
         Ok(())
     }

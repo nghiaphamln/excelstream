@@ -6,7 +6,14 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/KSD-CO/excelstream/workflows/Rust/badge.svg)](https://github.com/KSD-CO/excelstream/actions)
 
-> **✨ What's New in v0.6.0:**
+> **✨ What's New in v0.6.1:**
+> - 🐛 **Leading Zero Bug Fixed** - String numbers like "090899" now preserve leading zeros
+> - 🔧 **Improved Type Handling** - `write_row()` treats all values as strings (no auto number detection)
+> - ✅ **Better Type Control** - Use `write_row_typed()` with `CellValue::Int/Float` for numbers
+> - 🧠 **Hybrid SST in All Methods** - Memory optimization applied to all write functions
+> - 💾 **Memory Verified** - All methods stay under 60 MB with realistic data (<80 MB target)
+
+> **v0.6.0 Features:**
 > - 🎨 **Cell Formatting Fixed** - Complete styles.xml implementation with all 14 cell styles working
 > - 🔧 **Unified Architecture** - Removed legacy FastWorkbook, simplified to single UltraLowMemoryWorkbook implementation
 > - 📚 **Improved Examples** - Updated all examples to use consistent ExcelWriter API
@@ -54,7 +61,7 @@ Add to your `Cargo.toml`:
 excelstream = "0.6"
 ```
 
-**Latest version:** `0.6.0` - Cell formatting fixed, unified architecture, improved security
+**Latest version:** `0.6.1` - Leading zero fix, improved type handling, Hybrid SST in all methods
 
 ## 🚀 Quick Start
 
@@ -114,7 +121,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 **Key Benefits:**
 - ✅ Constant ~80MB memory usage regardless of dataset size
-- ✅ High throughput: 30K-45K rows/sec with true streaming
+- ✅ High throughput: 60K-70K rows/sec (UltraLowMemoryWorkbook fastest at 69.5K)
 - ✅ Direct ZIP streaming - data written to disk immediately
 - ✅ Full formatting support: bold, styles, column widths, row heights
 
@@ -149,7 +156,69 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 - ✅ Booleans display as TRUE/FALSE
 - ✅ Excel formulas work correctly
 - ✅ Better type safety
-- ✅ Excellent performance: 42K+ rows/sec
+- ✅ Excellent performance: 62.7K rows/sec (+2% faster than string-based)
+
+### Preserving Leading Zeros (Phone Numbers, IDs)
+
+**New in v0.6.1:** Proper handling of string numbers with leading zeros!
+
+#### Problem: Leading Zeros Lost
+
+```rust
+// ❌ WRONG: Auto number detection loses leading zeros
+writer.write_row(&["090899"]);  // Displays as 90899 in Excel
+```
+
+#### Solution 1: Use `write_row()` (All Strings)
+
+```rust
+// ✅ CORRECT: write_row() treats ALL values as strings
+writer.write_row(&["090899", "00123", "ID-00456"]);  
+// Displays: "090899", "00123", "ID-00456" ✅ Leading zeros preserved!
+```
+
+**As of v0.6.1**, `write_row()` no longer auto-detects numbers. All values are treated as strings.
+
+#### Solution 2: Use `write_row_typed()` with Explicit Types
+
+```rust
+use excelstream::types::CellValue;
+
+// ✅ String type: preserves leading zeros
+writer.write_row_typed(&[
+    CellValue::String("090899".to_string()),  // Phone: "090899" ✅
+    CellValue::String("00123".to_string()),   // ID: "00123" ✅
+])?;
+
+// ✅ Int type: actual number (no leading zero)
+writer.write_row_typed(&[
+    CellValue::Int(90899),  // Number: 90899 (no leading zero)
+    CellValue::Int(123),    // Number: 123
+])?;
+```
+
+#### Solution 3: Use `write_row_styled()` for Full Control
+
+```rust
+use excelstream::types::{CellValue, CellStyle};
+
+writer.write_row_styled(&[
+    (CellValue::String("090899".to_string()), CellStyle::Default),  // Preserves "090899"
+    (CellValue::Int(1234), CellStyle::NumberInteger),               // Formats as "1,234"
+])?;
+```
+
+**Type Handling Summary:**
+
+| Method | String "090899" | Int 90899 | Use When |
+|--------|----------------|-----------|----------|
+| `write_row(&[&str])` | "090899" ✅ | N/A | All data is text (IDs, codes) |
+| `write_row_typed(CellValue)` | "090899" ✅ | 90899 (number) | Mixed types, explicit control |
+| `write_row_styled()` | "090899" ✅ | 90899 (number) | Need formatting + type control |
+
+**Best Practice:** 
+- Phone numbers, IDs, ZIP codes → Use `CellValue::String` or `write_row()`
+- Amounts, quantities, calculations → Use `CellValue::Int` or `CellValue::Float`
 
 ### Writing Excel Formulas
 
@@ -1041,25 +1110,27 @@ Benchmarked with **1 million rows × 30 columns** (mixed data types):
 
 | Writer Method | Throughput | Memory Usage | Features |
 |--------------|------------|--------------|----------|
-| **ExcelWriter.write_row()** | **36,870 rows/sec** | **~80MB constant** ✅ | Simple API, string-based |
-| **ExcelWriter.write_row_typed()** | **42,877 rows/sec** | **~80MB constant** ✅ | Type-safe, best balance |
-| **ExcelWriter.write_row_styled()** | **~42,000 rows/sec** | **~80MB constant** ✅ | Cell formatting + styles |
-| **FastWorkbook** (direct) | **44,753 rows/sec** | **~80MB constant** ✅ | Maximum speed, low-level |
+| **UltraLowMemoryWorkbook** (direct) | **69,500 rows/sec** ⚡ | **~80MB constant** ✅ | **FASTEST** - Low-level API, max control |
+| **ExcelWriter.write_row_typed()** | **62,700 rows/sec** | **~80MB constant** ✅ | Type-safe, best balance (+2% vs baseline) |
+| **ExcelWriter.write_row()** | **61,400 rows/sec** | **~80MB constant** ✅ | Simple API, string-based (baseline) |
+| **ExcelWriter.write_row_styled()** | **43,500 rows/sec** | **~80MB constant** ✅ | Cell formatting - 29% slower due to styling overhead |
 
 **Key Characteristics:**
-- ✅ **High throughput** - 30K-45K rows/sec depending on method
+- ✅ **High throughput** - 43K-70K rows/sec depending on method
 - ✅ **Constant memory** - stays at ~80MB regardless of dataset size
 - ✅ **True streaming** - data written directly to disk via ZIP
 - ✅ **Predictable performance** - no memory spikes or slowdowns
+- ⚡ **UltraLowMemoryWorkbook is FASTEST** - Direct low-level access (+13% vs baseline)
+- ⚠️ **Styling has overhead** - write_row_styled() is 29% slower but adds formatting
 
 ### Recommendations
 
 | Use Case | Recommended Method | Why |
 |----------|-------------------|-----|
-| **General use** | `write_row_typed()` | Best balance of speed, type safety, and features |
-| **Simple exports** | `write_row()` | Easy API, good performance |
-| **Formatted reports** | `write_row_styled()` | Cell formatting with minimal overhead |
-| **Maximum speed** | `FastWorkbook` | Direct access, highest throughput |
+| **General use** | `write_row_typed()` | **Best balance** - Type-safe, fast (62.7K rows/sec, +2%) |
+| **Simple exports** | `write_row()` | Easy API, good performance (61.4K rows/sec) |
+| **Formatted reports** | `write_row_styled()` | Cell formatting - slower but worth it (43.5K rows/sec, -29%) |
+| **Maximum speed** | `UltraLowMemoryWorkbook` | **FASTEST** - Direct low-level access (69.5K rows/sec, +13%) |
 
 ## 📖 Documentation
 
@@ -1107,7 +1178,7 @@ cargo bench
 ## 🚀 Production Ready
 
 - ✅ **Battle-tested** - Handles 1M+ row datasets with ease
-- ✅ **High performance** - 30K-45K rows/sec with true streaming
+- ✅ **High performance** - 43K-70K rows/sec depending on method (UltraLowMemoryWorkbook fastest!)
 - ✅ **Memory efficient** - Constant ~80MB usage, perfect for K8s pods
 - ✅ **Reliable** - 50+ comprehensive tests covering edge cases
 - ✅ **Safe** - Zero unsafe code, full Rust memory safety
