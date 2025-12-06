@@ -1,6 +1,6 @@
 # excelstream
 
-🦀 **High-performance Rust library for Excel import/export with streaming support**
+🦀 **ExcelStream is a high-performance XLSX writer/reader for Rust, optimized for massive datasets with constant memory usage.**
 
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
