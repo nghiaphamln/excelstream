@@ -6,66 +6,23 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/KSD-CO/excelstream/workflows/Rust/badge.svg)](https://github.com/KSD-CO/excelstream/actions)
 
-> **✨ What's New in v0.8.0:**
-> - 🚫 **Removed Calamine** - Eliminated calamine dependency completely, now 100% custom implementation
+> **✨ What's New in v0.9.0:**
+> - � **84% Memory Reduction** - New streaming architecture: **2.7 MB** vs 17 MB (for 1M rows!)
+> - � **Zero Temp Files** - Stream XML directly into ZIP compressor (no disk I/O)
+> - ⚡ **Same Speed** - ~1400ms for 1M rows (compression level 6)
+> - 🎯 **ZeroTempWorkbook** - New API for absolute minimal memory usage
+> - � **Streaming ZIP Writer** - On-the-fly compression with data descriptors
+> - 💾 **Production Ready** - 2.7 MB RAM = run in 64 MB containers!
+
+> **v0.8.0 Features:**
+> - � **Removed Calamine** - Eliminated calamine dependency completely, now 100% custom implementation
 > - 🎯 **Constant Memory Streaming** - Read ANY file size with only 10-12 MB RAM (tested with 1GB+ files!)
 > - ⚡ **104x Memory Reduction** - 1.2GB XML → 11.6 MB RAM (vs 1204 MB with calamine)
-> - 🚀 **Faster Performance** - Write: 106-118K rows/sec (+70%!), Read: 50-60K rows/sec
+> - � **Faster Performance** - Write: 106-118K rows/sec (+70%!), Read: 50-60K rows/sec
 > - 📊 **Multi-sheet Support** - Full workbook.xml parsing with sheet_names() and rows_by_index()
 > - 🌍 **Unicode Support** - Proper handling of non-ASCII sheet names and special characters
 > - 🔧 **Custom XML Parser** - Chunked reading (128 KB buffers) with smart tag boundary detection
 > - 🐳 **Production Ready** - Process multi-GB Excel files in tiny 256 MB Kubernetes pods
-
-> **v0.7.0 Features:**
-> - 🔒 **Worksheet Protection** - Protect sheets with password and granular permissions
-> - 📐 **Cell Merging** - Merge cells horizontally and vertically (A1:C1, A1:A3)
-> - 📏 **Column Width** - Set custom column widths (previously no-op, now functional)
-> - 🎯 **Zero Overhead** - All new features maintain 15-25 MB memory and streaming performance
-
-
-> **v0.6.1 Features:**
-> - 🐛 **Leading Zero Bug Fixed** - String numbers like "090899" now preserve leading zeros
-> - 🔧 **Improved Type Handling** - `write_row()` treats all values as strings (no auto number detection)
-> - ✅ **Better Type Control** - Use `write_row_typed()` with `CellValue::Int/Float` for numbers
-> - 🧠 **Hybrid SST in All Methods** - Memory optimization applied to all write functions
-> - 💾 **Memory Verified** - All methods stay under 60 MB with realistic data (<80 MB target)
-
-> **v0.5.1 Features:**
-> - 🗜️ **Compression Level Configuration** - Control ZIP compression levels (0-9) for speed vs size trade-offs
-> - ⚙️ **Flexible API** - Set compression at workbook creation or anytime during writing
-> - ⚡ **Fast Mode** - Level 1 compression: 2x faster, suitable for development and testing
-> - 📦 **Balanced Mode** - Level 3 compression: Good balance between speed and file size
-> - 💾 **Production Mode** - Level 6 compression (default): Best file size for production exports
-> - 🔧 **Memory Optimization** - PostgreSQL streaming with optimized batch sizes (500 rows)
-
-> **v0.5.0 Features:**
-> - 🚀 **Hybrid SST Optimization** - Intelligent selective deduplication for optimal memory usage
-> - 💾 **Ultra-Low Memory** - 15-25 MB for 1M rows (was 125 MB), 89% reduction!
-> - ⚡ **58% Faster** - 25K+ rows/sec with hybrid SST strategy
-> - 🎯 **Smart Detection** - Numbers inline, long strings inline, only short repeated strings deduplicated
-
-## ✨ Features
-
-- 🚀 **Memory-Efficient Writing** - Write millions of rows with constant 15-25 MB RAM
-- 📖 **Custom Streaming Reader** - Built-in chunked XML parser (no calamine dependency)
-  - `ExcelReader` - Constant memory streaming: 10-12 MB for ANY file size, 50K-60K rows/sec
-  - 104x more efficient than previous calamine-based reader
-- 💾 **Ultra-Low Memory** - 89% less memory than alternatives for writing (15 MB vs 125 MB for 1M rows)
-- ⚡ **Blazing Fast** - Write: 25K-70K rows/sec, Read: 60K rows/sec (StreamingReader)
-- 🧠 **Smart Memory** - Intelligent deduplication: numbers inline, long strings inline, only repeated short strings deduplicated
-- 🗜️ **Compression Control** - ZIP levels 0-9 for speed/size trade-offs (2x faster in dev mode)
-- 🎨 **Cell Formatting** - 14 predefined styles (bold, currency, %, dates, highlights, borders)
-- 📐 **Cell Merging** - Merge cells horizontally/vertically for headers and grouped data
-- 📏 **Column Width & Row Height** - Full layout control for professional reports
-- 🔒 **Worksheet Protection** - Password protection with 12 granular permissions
-- 📐 **Formula Support** - Excel formulas (=SUM, =AVERAGE, =IF, etc.) calculate correctly
-- 🎯 **Type Safety** - Strong typing: Int, Float, Bool, DateTime, Formula, String
-- 🔧 **50+ Columns** - Handles complex schemas with mixed data types
-- ❌ **Better Errors** - Context-rich error messages with debugging info
-- 📊 **Multi-format** - Read XLSX, XLS, ODS; Write XLSX with full compatibility
-- 🪟 **Cross-Platform** - Windows, Linux, macOS (tested on all three)
-- 🐳 **K8s Ready** - Perfect for memory-limited containers (<512 MB RAM)
-- ✅ **Production Proven** - 430K+ rows exported in production, 50+ tests, zero unsafe code
 
 ## 🎯 Why ExcelStream?
 
@@ -90,18 +47,20 @@ for row in workbook.worksheet("Sheet1")?.rows() {
 **What About Calamine?**
 - Even calamine (popular Rust library) loads full files into memory
 - v0.7.x used calamine: 86 MB file → 86 MB RAM (better than most, but not streaming)
-- v0.8.0+ removes calamine completely, implements custom chunked XML parser
-
 ### The ExcelStream Solution: Streaming Architecture
 
 ```rust
-// ✅ ExcelStream Writer - Constant 15-25 MB regardless of output size
-let mut writer = ExcelWriter::new("huge.xlsx")?;
-for i in 0..10_000_000 {
-    writer.write_row(&[&i.to_string(), "data"])?; // Still only 20 MB!
-}
+// ✅✅ ExcelStream ZeroTempWorkbook (v0.9.0+) - Stream XML directly into compressor!
+use excelstream::fast_writer::ZeroTempWorkbook;
 
-// ✅✅ ExcelStream Reader (v0.8.0+) - Custom chunked XML parser!
+let mut writer = ZeroTempWorkbook::new("huge.xlsx", 6)?; // compression level 6
+writer.add_worksheet("Sheet1")?;
+for i in 0..10_000_000 {
+    writer.write_row(&[&i.to_string(), "data"])?; // Only 2.7 MB RAM!
+}
+writer.close()?;
+
+// ✅ ExcelStream Reader (v0.8.0+) - Custom chunked XML parser!
 let mut reader = ExcelReader::open("huge.xlsx")?;
 for row in reader.rows("Sheet1")? {
     // 86 MB file (1.2 GB uncompressed XML) = only 11.6 MB RAM! 50K-60K rows/sec!
@@ -109,26 +68,24 @@ for row in reader.rows("Sheet1")? {
 }
 ```
 
-**v0.8.0 Architecture:**
-- Custom ZIP extractor for sheet XML
-- Chunked XML parsing (128 KB chunks)
-- Smart buffering with split-tag handling
-- Shared Strings Table (SST) loaded once
-- Result: 104x less memory than loading full XML!
+**v0.9.0 Architecture:**
+- **Zero temp files** - Stream XML directly into ZIP compressor
+- On-the-fly DEFLATE compression with data descriptors
+- 4KB XML buffer (reused per row)
+- Direct write to final .xlsx file
+- Result: **84% less memory** than v0.8 (2.7 MB vs 17 MB)!
 
 **Why This Matters:**
 
-| Scenario | Traditional Library | ExcelStream Write | ExcelStream Read (v0.8.0+) |
-|----------|-------------------|-------------------|---------------------------|
-| Write 10 MB | 100 MB RAM | **15 MB RAM** ✅ | N/A |
-| Write 100 MB | 1+ GB RAM | **15 MB RAM** ✅ | N/A |
-| Write 1 GB | ❌ Crash | **25 MB RAM** ✅ | N/A |
-| Read 10 MB file | 100 MB RAM | N/A | **~10 MB RAM** ✅ |
-| Read 100 MB file | 1+ GB RAM | N/A | **~11 MB RAM** ✅ |
-| Read 1 GB file | ❌ Crash | N/A | **~12 MB RAM** ✅ |
+| Scenario | Traditional Library | ExcelStream v0.8 | ExcelStream v0.9 |
+|----------|-------------------|-------------------|------------------|
+| Write 1M rows | 100+ MB RAM | 17 MB RAM | **2.7 MB RAM** ✅ |
+| Write 10M rows | ❌ Crash | 17 MB RAM | **2.7 MB RAM** ✅ |
+| Read 86 MB file (1.2 GB XML) | ❌ Crash | **11.6 MB RAM** ✅ | **11.6 MB RAM** ✅ |
+| Read 100 MB file | 1+ GB RAM | **~12 MB RAM** ✅ | **~12 MB RAM** ✅ |
 | K8s pod (<512MB) | ❌ OOMKilled | ✅ Works | ✅ Always works ✅ |
 
-**Note:** v0.8.0 uses custom XML parser (no calamine). Previous versions loaded full file into memory.
+**Note:** v0.9.0 streaming write architecture (zero temp files) + v0.8.0 custom XML parser (no calamine).
 
 ## 🚀 Real-World Use Cases
 
@@ -413,7 +370,44 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 - SST loaded once, rows streamed incrementally
 - No formula/formatting support (raw values only)
 
-### Writing Excel Files (Streaming - v0.2.0)
+### Writing Excel Files (Zero Temp Streaming - v0.9.0)
+
+**New in v0.9.0:** `ZeroTempWorkbook` - Stream XML directly into ZIP compressor! **84% less memory** than v0.8.
+
+```rust
+use excelstream::fast_writer::ZeroTempWorkbook;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Create workbook with compression level 6 (balanced)
+    let mut writer = ZeroTempWorkbook::new("output.xlsx", 6)?;
+    
+    // Add a worksheet
+    writer.add_worksheet("Sales Data")?;
+    
+    // Write millions of rows with only 2.7 MB RAM!
+    for i in 1..=10_000_000 {
+        writer.write_row(&[
+            &i.to_string(),
+            &format!("Product{}", i),
+            &(i as f64 * 99.99).to_string(),
+        ])?;
+    }
+    
+    // Close and finalize (writes central directory)
+    writer.close()?;
+    
+    Ok(())
+}
+```
+
+**Performance (v0.9.0):**
+- ✅ **Memory:** Only **2.7 MB** for ANY SIZE (84% less than v0.8!)
+- ✅ **Speed:** 50K-60K rows/sec (same as v0.8)
+- ✅ **Zero Temp Files:** Streams directly to final .xlsx
+- ✅ **K8s Ready:** Works in 128 MB pods
+- 🎯 **Architecture:** On-the-fly DEFLATE with data descriptors
+
+**Legacy Writer (v0.2.0 - still available):**
 
 ```rust
 use excelstream::writer::ExcelWriter;

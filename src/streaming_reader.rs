@@ -19,9 +19,10 @@
 //! - Best for: Fast iteration, simple data extraction, no formatting needs
 
 use crate::error::{ExcelError, Result};
+use crate::fast_writer::streaming_zip_reader::StreamingZipReader;
 use crate::types::{CellValue, Row};
+use std::io::{BufReader, Read};
 use std::path::Path;
-use zip::ZipArchive;
 
 /// Streaming reader for XLSX files
 ///
@@ -40,7 +41,7 @@ use zip::ZipArchive;
 /// - Files with small SST but many rows
 /// - Simple data extraction without formatting
 pub struct StreamingReader {
-    archive: ZipArchive<std::fs::File>,
+    archive: StreamingZipReader,
     sst: Vec<String>,
     sheet_names: Vec<String>,
     sheet_paths: Vec<String>,
@@ -72,11 +73,8 @@ impl StreamingReader {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let file = std::fs::File::open(path)
-            .map_err(|e| ExcelError::ReadError(format!("Failed to open file: {}", e)))?;
-
-        let mut archive = ZipArchive::new(file)
-            .map_err(|e| ExcelError::ReadError(format!("Failed to read ZIP: {}", e)))?;
+        let mut archive = StreamingZipReader::open(path)
+            .map_err(|e| ExcelError::ReadError(format!("Failed to open ZIP: {}", e)))?;
 
         // Load Shared Strings Table (can't avoid this)
         let sst = Self::load_shared_strings(&mut archive)?;
@@ -203,18 +201,21 @@ impl StreamingReader {
                     "Sheet '{}' not found. Available sheets: {:?}",
                     sheet_name, self.sheet_names
                 ))
-            })?;
+            })?
+            .clone();
 
-        let sheet_file = self
+        // Get streaming reader for worksheet XML
+        let reader = self
             .archive
-            .by_name(sheet_path)
+            .read_entry_streaming_by_name(&sheet_path)
             .map_err(|e| ExcelError::ReadError(format!("Failed to open sheet: {}", e)))?;
 
         Ok(RowIterator {
-            reader: std::io::BufReader::new(sheet_file),
+            reader: BufReader::with_capacity(64 * 1024, reader), // 64KB buffer
             sst: &self.sst,
-            buffer: String::new(),
-            position: 0,
+            buffer: String::with_capacity(128 * 1024), // 128KB for XML parsing
+            in_row: false,
+            row_content: String::with_capacity(8 * 1024), // 8KB per row
         })
     }
 
@@ -259,20 +260,14 @@ impl StreamingReader {
     ///
     /// This MUST be loaded fully because cells reference strings by index.
     /// For files with millions of unique strings, this can still be large.
-    fn load_shared_strings(archive: &mut ZipArchive<std::fs::File>) -> Result<Vec<String>> {
+    fn load_shared_strings(archive: &mut StreamingZipReader) -> Result<Vec<String>> {
         let mut sst = Vec::new();
 
         // Try to find sharedStrings.xml
-        let mut sst_file = match archive.by_name("xl/sharedStrings.xml") {
-            Ok(f) => f,
+        let xml_data = match archive.read_entry_by_name("xl/sharedStrings.xml") {
+            Ok(data) => String::from_utf8_lossy(&data).to_string(),
             Err(_) => return Ok(sst), // No SST = all cells are inline
         };
-
-        let mut xml_data = String::new();
-        use std::io::Read;
-        sst_file
-            .read_to_string(&mut xml_data)
-            .map_err(|e| ExcelError::ReadError(e.to_string()))?;
 
         // Parse all <si> tags (multiple per line in compact XML)
         let mut pos = 0;
@@ -306,22 +301,16 @@ impl StreamingReader {
     /// Parses workbook.xml to get sheet names and their corresponding worksheet paths.
     /// Supports Unicode sheet names.
     fn load_sheet_info(
-        archive: &mut ZipArchive<std::fs::File>,
+        archive: &mut StreamingZipReader,
     ) -> Result<(Vec<String>, Vec<String>)> {
         let mut sheet_names = Vec::new();
         let mut sheet_ids = Vec::new();
 
-        // Load workbook.xml in a scope to release the borrow
-        {
-            let mut workbook_file = archive.by_name("xl/workbook.xml").map_err(|e| {
-                ExcelError::ReadError(format!("Failed to open workbook.xml: {}", e))
-            })?;
-
-            let mut xml_data = String::new();
-            use std::io::Read;
-            workbook_file
-                .read_to_string(&mut xml_data)
-                .map_err(|e| ExcelError::ReadError(e.to_string()))?;
+        // Load workbook.xml
+        let xml_data = archive
+            .read_entry_by_name("xl/workbook.xml")
+            .map_err(|e| ExcelError::ReadError(format!("Failed to open workbook.xml: {}", e)))?;
+        let xml_data = String::from_utf8_lossy(&xml_data).to_string();
 
             // Parse <sheet> tags to get names and rIds
             // Example: <sheet name="Sheet1" sheetId="1" r:id="rId1"/>
@@ -355,20 +344,13 @@ impl StreamingReader {
                     break;
                 }
             }
-        } // workbook_file dropped here
-
         // Now load workbook.xml.rels to map rIds to worksheet paths
         let mut sheet_paths = Vec::new();
-        {
-            let mut rels_file = archive.by_name("xl/_rels/workbook.xml.rels").map_err(|e| {
-                ExcelError::ReadError(format!("Failed to open workbook.xml.rels: {}", e))
-            })?;
-
-            let mut rels_data = String::new();
-            use std::io::Read;
-            rels_file
-                .read_to_string(&mut rels_data)
-                .map_err(|e| ExcelError::ReadError(e.to_string()))?;
+        
+        let rels_data = archive
+            .read_entry_by_name("xl/_rels/workbook.xml.rels")
+            .map_err(|e| ExcelError::ReadError(format!("Failed to open workbook.xml.rels: {}", e)))?;
+        let rels_data = String::from_utf8_lossy(&rels_data).to_string();
 
             // Map rIds to worksheet paths
             for rid in &sheet_ids {
@@ -400,7 +382,6 @@ impl StreamingReader {
                     }
                 }
             }
-        } // rels_file dropped here
 
         if sheet_names.len() != sheet_paths.len() {
             return Err(ExcelError::ReadError(format!(
@@ -419,88 +400,50 @@ impl StreamingReader {
 }
 
 /// Iterator over rows in a worksheet
+/// Streams XML data from ZIP without loading entire worksheet into memory
 pub struct RowIterator<'a> {
-    reader: std::io::BufReader<zip::read::ZipFile<'a, std::fs::File>>,
+    reader: BufReader<Box<dyn Read + 'a>>,
     sst: &'a [String],
-    buffer: String,  // String buffer for accumulated data
-    position: usize, // Current position in buffer
+    buffer: String,       // Buffer for reading XML chunks
+    in_row: bool,        // Whether we're currently inside a <row> tag
+    row_content: String, // Buffer for accumulating current row XML
 }
 
 impl<'a> Iterator for RowIterator<'a> {
     type Item = Result<Vec<String>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        use std::io::Read;
-
-        const CHUNK_SIZE: usize = 131072; // 128 KB chunks
-
         loop {
             // Try to find complete <row>...</row> in current buffer
-            let search_slice = &self.buffer[self.position..];
+            if let Some(row) = self.try_extract_row() {
+                return Some(Ok(row));
+            }
 
-            if let Some(row_start) = search_slice.find("<row ") {
-                if let Some(row_end_pos) = search_slice[row_start..].find("</row>") {
-                    // Found complete row
-                    let row_end = row_start + row_end_pos + 6; // Include "</row>"
-                    let row_xml = &search_slice[row_start..row_end];
-
-                    let result = Self::parse_row(row_xml, self.sst);
-
-                    // Move position past this row
-                    self.position += row_end;
-
-                    return Some(result);
-                } else {
-                    // Found <row but no </row> - need more data
-                    // Remove processed data, keep from <row onwards
-                    self.buffer = self.buffer[self.position + row_start..].to_string();
-                    self.position = 0;
-
-                    // Read more data
-                    let mut chunk = vec![0u8; CHUNK_SIZE];
-                    match self.reader.read(&mut chunk) {
-                        Ok(0) => return None, // EOF without closing tag
-                        Ok(n) => {
-                            if let Ok(s) = std::str::from_utf8(&chunk[..n]) {
-                                self.buffer.push_str(s);
-                            }
-                        }
-                        Err(e) => return Some(Err(ExcelError::ReadError(e.to_string()))),
-                    }
-                    continue;
-                }
-            } else {
-                // No <row found - advance position but keep tail for split tags
-                if search_slice.len() > 10 {
-                    // Move forward, keeping last 10 bytes
-                    let advance = search_slice.len() - 10;
-                    self.position += advance;
-
-                    // If buffer too large, trim processed part
-                    if self.position > 1_000_000 {
-                        self.buffer = self.buffer[self.position..].to_string();
-                        self.position = 0;
-                    }
-                } else if search_slice.is_empty() {
-                    // Buffer exhausted, read more
-                    self.buffer.clear();
-                    self.position = 0;
-                } else {
-                    // Small remaining data, keep it and read more
-                    self.buffer = self.buffer[self.position..].to_string();
-                    self.position = 0;
-                }
-
-                // Read next chunk
-                let mut chunk = vec![0u8; CHUNK_SIZE];
-                match self.reader.read(&mut chunk) {
-                    Ok(0) => return None, // EOF
-                    Ok(n) => {
-                        if let Ok(s) = std::str::from_utf8(&chunk[..n]) {
-                            self.buffer.push_str(s);
+            // Need more data - read next chunk
+            let mut chunk = vec![0u8; 32 * 1024]; // 32KB chunks
+            match self.reader.read(&mut chunk) {
+                Ok(0) => {
+                    // EOF reached
+                    if !self.row_content.is_empty() {
+                        // Parse any remaining incomplete row
+                        if let Ok(row) = Self::parse_row(&self.row_content, self.sst) {
+                            self.row_content.clear();
+                            return Some(Ok(row));
                         }
                     }
-                    Err(e) => return Some(Err(ExcelError::ReadError(e.to_string()))),
+                    return None;
+                }
+                Ok(n) => {
+                    // Append new data to buffer
+                    if let Ok(s) = std::str::from_utf8(&chunk[..n]) {
+                        self.buffer.push_str(s);
+                    }
+                }
+                Err(e) => {
+                    return Some(Err(ExcelError::ReadError(format!(
+                        "Failed to read XML: {}",
+                        e
+                    ))));
                 }
             }
         }
@@ -508,6 +451,64 @@ impl<'a> Iterator for RowIterator<'a> {
 }
 
 impl<'a> RowIterator<'a> {
+    /// Try to extract a complete row from the buffer
+    fn try_extract_row(&mut self) -> Option<Vec<String>> {
+        loop {
+            // Look for <row> start
+            if !self.in_row {
+                if let Some(row_start) = self.buffer.find("<row ") {
+                    self.in_row = true;
+                    // Move from <row onwards to row_content, keep rest in buffer
+                    self.row_content.push_str(&self.buffer[row_start..]);
+                    self.buffer.drain(..);
+                } else {
+                    // No <row found, discard old data but keep some for potential partial tag
+                    if self.buffer.len() > 1024 {
+                        self.buffer.drain(..self.buffer.len() - 100);
+                    }
+                    return None;
+                }
+            }
+
+            // If in row, look for </row> end
+            if self.in_row {
+                // Check row_content first
+                if let Some(row_end_pos) = self.row_content.find("</row>") {
+                    // Found complete row in row_content
+                    let row_end = row_end_pos + 6; // Include "</row>"
+                    let row_xml = self.row_content[..row_end].to_string();
+
+                    // Move remaining data back to buffer for next iteration
+                    if row_end < self.row_content.len() {
+                        self.buffer.insert_str(0, &self.row_content[row_end..]);
+                    }
+                    
+                    // Clear and reset
+                    self.row_content.clear();
+                    self.in_row = false;
+
+                    // Parse and return
+                    if let Ok(row) = Self::parse_row(&row_xml, self.sst) {
+                        return Some(row);
+                    }
+                    // If parse fails, continue to next row
+                    continue;
+                }
+                
+                // Not in row_content, check buffer
+                if !self.buffer.is_empty() {
+                    // Append buffer to row_content
+                    self.row_content.push_str(&self.buffer);
+                    self.buffer.clear();
+                    continue; // Try again
+                }
+                
+                // Need more data
+                return None;
+            }
+        }
+    }
+
     fn parse_row(row_xml: &str, sst: &[String]) -> Result<Vec<String>> {
         let mut row_data = Vec::new();
         let mut pos = 0;
@@ -517,12 +518,19 @@ impl<'a> RowIterator<'a> {
             .or_else(|| row_xml[pos..].find("<c>"))
         {
             let cell_start = pos + cell_start;
-            let cell_end = match row_xml[cell_start..].find("</c>") {
-                Some(end) => cell_start + end + 4,
-                None => break,
+            
+            // Handle both self-closing <c ... /> and <c ...></c>
+            let (cell_end, cell_xml) = if let Some(self_close_pos) = row_xml[cell_start..].find("/>") {
+                let end = cell_start + self_close_pos + 2;
+                let xml = &row_xml[cell_start..end];
+                (end, xml)
+            } else if let Some(close_tag_pos) = row_xml[cell_start..].find("</c>") {
+                let end = cell_start + close_tag_pos + 4;
+                let xml = &row_xml[cell_start..end];
+                (end, xml)
+            } else {
+                break; // Incomplete cell tag
             };
-
-            let cell_xml = &row_xml[cell_start..cell_end];
 
             // Extract cell reference (e.g., "A1", "B1", "AA1")
             let col_idx = if let Some(r_start) = cell_xml.find("r=\"") {

@@ -5,7 +5,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n📊 Memory Profile: StreamingReader vs ExcelReader");
     println!("===================================================\n");
 
-    let path = "large_test_1M.xlsx";
+    let path = "memory_test_balanced.xlsx";
 
     if !std::path::Path::new(path).exists() {
         eprintln!("❌ File not found: {}", path);

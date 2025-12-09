@@ -50,8 +50,4 @@ pub enum ExcelError {
     NotSupported(String),
 }
 
-impl From<zip::result::ZipError> for ExcelError {
-    fn from(err: zip::result::ZipError) -> Self {
-        ExcelError::WriteError(err.to_string())
-    }
-}
+// Note: std::io::Error is already mapped via the `IoError(#[from] std::io::Error)` variant above.

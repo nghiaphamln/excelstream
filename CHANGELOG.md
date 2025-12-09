@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2024-12-08
+
+### 🎉 Major Feature: Zero-Temp Streaming Architecture
+
+**84% Memory Reduction** - Revolutionary streaming write implementation that eliminates temporary files entirely!
+
+### Added
+- **ZeroTempWorkbook**: Stream XML directly into ZIP compressor
+  - **2.7 MB RAM** for ANY SIZE (vs 17 MB in v0.8.0) = **84% reduction**
+  - **Zero temp files**: Direct streaming to final .xlsx file
+  - **StreamingZipWriter**: Custom ZIP writer with on-the-fly compression
+  - **Data descriptors**: Write CRC/sizes after compressed data (no seeking)
+  - **4KB XML buffer**: Reused per row for minimal allocations
+  - **Same speed**: 50K-60K rows/sec (comparable to zip crate)
+  - **File size**: ~7% larger than zip crate (acceptable trade-off)
+
+### Performance
+- **Write Performance (1M rows)**:
+  - `ZeroTempWorkbook`: **2.7 MB RAM**, ~1400ms, 16 MB file ✅
+  - `UltraLowMemoryWorkbook` (v0.8.0): 17 MB RAM, ~1400ms, 15 MB file
+  - Traditional libraries: 100+ MB RAM or crash
+- **Architecture**: On-the-fly DEFLATE compression with streaming XML generation
+- **Validation**: Tested with 1M-10M rows, verified with Excel and `unzip -t`
+
+### Changed
+- Bumped version to 0.9.0
+- Updated Cargo.toml description to highlight 2.7 MB memory footprint
+- Updated README with v0.9.0 performance numbers and new architecture
+- Exposed `ZeroTempWorkbook` in public API alongside `UltraLowMemoryWorkbook`
+
+### Technical Details
+- **StreamingZipWriter**: 
+  - Writes local file headers with bit 3 set (data descriptor flag)
+  - Writes data descriptors after compressed data (CRC32, sizes)
+  - Assembles central directory at end
+  - No seeking, no temp files, pure streaming
+- **ZeroTempWorkbook**:
+  - `new(path, compression_level)`: Create workbook with configurable compression
+  - `add_worksheet(name)`: Start new sheet with immediate XML header write
+  - `write_row(values)`: Build row XML in 4KB buffer, stream to compressor
+  - `close()`: Finish sheet, write metadata files, close ZIP
+- **CrcCountingWriter**: Helper that computes CRC32 while writing compressed data
+
+### Notes
+- **Backward compatibility**: `UltraLowMemoryWorkbook` still available (uses temp files)
+- **Migration**: Consider switching to `ZeroTempWorkbook` for 84% memory reduction
+- **Trade-offs**: File size +7% (16 MB vs 15 MB) due to streaming compression
+
 ## [0.8.0] - 2024-12-06
 
 ### Changed
