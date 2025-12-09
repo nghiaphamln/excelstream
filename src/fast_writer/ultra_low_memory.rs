@@ -27,8 +27,8 @@ impl UltraLowMemoryWorkbook {
         })
     }
 
-    pub fn protect_sheet(&mut self, _options: ProtectionOptions) -> Result<()> {
-        Ok(())
+    pub fn protect_sheet(&mut self, options: ProtectionOptions) -> Result<()> {
+        self.inner.protect_sheet(options)
     }
 
     pub fn add_worksheet(&mut self, name: &str) -> Result<()> {
@@ -58,25 +58,9 @@ impl UltraLowMemoryWorkbook {
         self.inner.write_row(&refs)
     }
 
-    pub fn write_row_styled(&mut self, _values: &[crate::types::StyledCell]) -> Result<()> {
-        // TODO: Implement styling in ZeroTempWorkbook
-        // For now, just write the cell values without styling
-        let string_values: Vec<String> = _values
-            .iter()
-            .map(|styled| match &styled.value {
-                CellValue::String(s) => s.clone(),
-                CellValue::Int(i) => i.to_string(),
-                CellValue::Float(f) => f.to_string(),
-                CellValue::Bool(b) => if *b { "TRUE" } else { "FALSE" }.to_string(),
-                CellValue::DateTime(dt) => dt.to_string(),
-                CellValue::Error(e) => e.clone(),
-                CellValue::Formula(f) => f.clone(),
-                CellValue::Empty => String::new(),
-            })
-            .collect();
-
-        let refs: Vec<&str> = string_values.iter().map(|s| s.as_str()).collect();
-        self.inner.write_row(&refs)
+    pub fn write_row_styled(&mut self, values: &[crate::types::StyledCell]) -> Result<()> {
+        // Delegate to ZeroTempWorkbook which now supports styling
+        self.inner.write_row_styled(values)
     }
 
     pub fn set_compression_level(&mut self, level: u32) {

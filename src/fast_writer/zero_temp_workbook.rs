@@ -47,6 +47,8 @@ impl ZeroTempWorkbook {
         self.worksheets.push(name.to_string());
         self.current_row = 0;
         self.max_col = 0;
+        // Reset protection for new worksheet
+        self.protection = None;
 
         // Start new worksheet entry in ZIP
         let entry_name = format!("xl/worksheets/sheet{}.xml", self.worksheet_count);
@@ -63,6 +65,11 @@ impl ZeroTempWorkbook {
             .write_data(header.as_bytes())?;
         self.in_worksheet = true;
 
+        Ok(())
+    }
+
+    pub fn protect_sheet(&mut self, options: ProtectionOptions) -> Result<()> {
+        self.protection = Some(options);
         Ok(())
     }
 
@@ -116,14 +123,168 @@ impl ZeroTempWorkbook {
         Ok(())
     }
 
+    /// Write a row with cell styling
+    pub fn write_row_styled(&mut self, cells: &[crate::types::StyledCell]) -> Result<()> {
+        if !self.in_worksheet {
+            return Err(crate::error::ExcelError::WriteError(
+                "No worksheet started".to_string(),
+            ));
+        }
+
+        self.current_row += 1;
+        self.max_col = self.max_col.max(cells.len() as u32);
+
+        // Build row XML in buffer
+        self.xml_buffer.clear();
+        self.xml_buffer.extend_from_slice(b"<row r=\"");
+        self.xml_buffer
+            .extend_from_slice(self.current_row.to_string().as_bytes());
+        self.xml_buffer.extend_from_slice(b"\">");
+
+        for (col_idx, styled_cell) in cells.iter().enumerate() {
+            let col_letter = Self::column_letter(col_idx as u32 + 1);
+            let value = &styled_cell.value;
+            let style_id = styled_cell.style.index();
+
+            self.xml_buffer.extend_from_slice(b"<c r=\"");
+            self.xml_buffer.extend_from_slice(col_letter.as_bytes());
+            self.xml_buffer
+                .extend_from_slice(self.current_row.to_string().as_bytes());
+            self.xml_buffer.extend_from_slice(b"\"");
+
+            // Add style attribute if not default
+            if style_id > 0 {
+                self.xml_buffer.extend_from_slice(b" s=\"");
+                self.xml_buffer
+                    .extend_from_slice(style_id.to_string().as_bytes());
+                self.xml_buffer.extend_from_slice(b"\"");
+            }
+
+            // Write cell value based on type
+            match value {
+                crate::types::CellValue::Empty => {
+                    self.xml_buffer.extend_from_slice(b"/>");
+                }
+                crate::types::CellValue::Int(i) => {
+                    self.xml_buffer.extend_from_slice(b" t=\"n\"><v>");
+                    self.xml_buffer.extend_from_slice(i.to_string().as_bytes());
+                    self.xml_buffer.extend_from_slice(b"</v></c>");
+                }
+                crate::types::CellValue::Float(f) => {
+                    self.xml_buffer.extend_from_slice(b" t=\"n\"><v>");
+                    self.xml_buffer.extend_from_slice(f.to_string().as_bytes());
+                    self.xml_buffer.extend_from_slice(b"</v></c>");
+                }
+                crate::types::CellValue::Bool(b) => {
+                    self.xml_buffer.extend_from_slice(b" t=\"b\"><v>");
+                    self.xml_buffer
+                        .extend_from_slice(if *b { b"1" } else { b"0" });
+                    self.xml_buffer.extend_from_slice(b"</v></c>");
+                }
+                crate::types::CellValue::String(s) => {
+                    self.xml_buffer
+                        .extend_from_slice(b" t=\"inlineStr\"><is><t>");
+                    Self::write_escaped(&mut self.xml_buffer, s);
+                    self.xml_buffer.extend_from_slice(b"</t></is></c>");
+                }
+                crate::types::CellValue::Formula(f) => {
+                    self.xml_buffer.extend_from_slice(b"><f>");
+                    Self::write_escaped(&mut self.xml_buffer, f);
+                    self.xml_buffer.extend_from_slice(b"</f></c>");
+                }
+                crate::types::CellValue::DateTime(dt) => {
+                    // Excel date serial number
+                    self.xml_buffer.extend_from_slice(b" t=\"n\"><v>");
+                    self.xml_buffer.extend_from_slice(dt.to_string().as_bytes());
+                    self.xml_buffer.extend_from_slice(b"</v></c>");
+                }
+                crate::types::CellValue::Error(e) => {
+                    self.xml_buffer.extend_from_slice(b" t=\"e\"><v>");
+                    Self::write_escaped(&mut self.xml_buffer, e);
+                    self.xml_buffer.extend_from_slice(b"</v></c>");
+                }
+            }
+        }
+
+        self.xml_buffer.extend_from_slice(b"</row>");
+
+        // Stream to compressor immediately
+        self.zip_writer
+            .as_mut()
+            .unwrap()
+            .write_data(&self.xml_buffer)?;
+
+        Ok(())
+    }
+
     fn finish_current_worksheet(&mut self) -> Result<()> {
         if self.in_worksheet {
-            // Write worksheet footer
-            let footer = "</sheetData></worksheet>";
+            // Close sheetData
             self.zip_writer
                 .as_mut()
                 .unwrap()
-                .write_data(footer.as_bytes())?;
+                .write_data(b"</sheetData>")?;
+
+            // Add sheetProtection if present
+            if let Some(ref prot) = self.protection {
+                let mut protection_xml = String::from("<sheetProtection sheet=\"1\"");
+
+                // Add password hash if present
+                if let Some(ref hash) = prot.password_hash {
+                    protection_xml.push_str(&format!(" password=\"{}\"", hash));
+                }
+
+                // For Excel protection:
+                // - If field = false (don't allow), we don't set attribute (default is protected)
+                // - If field = true (allow), we set attribute = "0" (not protected)
+
+                if prot.select_locked_cells {
+                    protection_xml.push_str(" selectLockedCells=\"0\"");
+                }
+                if prot.select_unlocked_cells {
+                    protection_xml.push_str(" selectUnlockedCells=\"0\"");
+                }
+                if prot.format_cells {
+                    protection_xml.push_str(" formatCells=\"0\"");
+                }
+                if prot.format_columns {
+                    protection_xml.push_str(" formatColumns=\"0\"");
+                }
+                if prot.format_rows {
+                    protection_xml.push_str(" formatRows=\"0\"");
+                }
+                if prot.insert_columns {
+                    protection_xml.push_str(" insertColumns=\"0\"");
+                }
+                if prot.insert_rows {
+                    protection_xml.push_str(" insertRows=\"0\"");
+                }
+                if prot.delete_columns {
+                    protection_xml.push_str(" deleteColumns=\"0\"");
+                }
+                if prot.delete_rows {
+                    protection_xml.push_str(" deleteRows=\"0\"");
+                }
+                if prot.sort {
+                    protection_xml.push_str(" sort=\"0\"");
+                }
+                if prot.auto_filter {
+                    protection_xml.push_str(" autoFilter=\"0\"");
+                }
+
+                protection_xml.push_str("/>");
+
+                self.zip_writer
+                    .as_mut()
+                    .unwrap()
+                    .write_data(protection_xml.as_bytes())?;
+            }
+
+            // Close worksheet
+            self.zip_writer
+                .as_mut()
+                .unwrap()
+                .write_data(b"</worksheet>")?;
             self.in_worksheet = false;
         }
         Ok(())
@@ -271,10 +432,38 @@ impl ZeroTempWorkbook {
         let xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
 <numFmts count="0"/>
-<fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts>
-<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>
-<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
-<cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/></cellXfs>
+<fonts count="3">
+<font><sz val="11"/><name val="Calibri"/></font>
+<font><b/><sz val="11"/><name val="Calibri"/></font>
+<font><i/><sz val="11"/><name val="Calibri"/></font>
+</fonts>
+<fills count="5">
+<fill><patternFill patternType="none"/></fill>
+<fill><patternFill patternType="gray125"/></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFFFFF00"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FF00FF00"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFFF0000"/></patternFill></fill>
+</fills>
+<borders count="2">
+<border><left/><right/><top/><bottom/><diagonal/></border>
+<border><left style="thin"/><right style="thin"/><top style="thin"/><bottom style="thin"/></border>
+</borders>
+<cellXfs count="14">
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="3" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="5" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="9" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="14" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="22" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="0" fontId="0" fillId="2" borderId="0" xfId="0" applyFill="1"/>
+<xf numFmtId="0" fontId="0" fillId="3" borderId="0" xfId="0" applyFill="1"/>
+<xf numFmtId="0" fontId="0" fillId="4" borderId="0" xfId="0" applyFill="1"/>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>
+</cellXfs>
 </styleSheet>"#;
         self.zip_writer
             .as_mut()

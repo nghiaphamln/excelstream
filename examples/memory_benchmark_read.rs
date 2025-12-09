@@ -96,7 +96,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!();
     println!("   ✅ Completed in {:.2}s", read_time.as_secs_f64());
-    println!("   Total rows: {}", row_count);
+    println!("   Total rows: {} (including header)", row_count);
     println!(
         "   Total cells: {} ({:.1}M)",
         cell_count,
@@ -110,6 +110,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "   Throughput: {:.0} cells/sec",
         cell_count as f64 / read_time.as_secs_f64()
     );
+
+    // Verify row count
+    let expected_rows = 1_000_001; // 1M data rows + 1 header row
+    if row_count == expected_rows {
+        println!("   ✅ Row count correct: {} rows", row_count);
+    } else {
+        println!(
+            "   ⚠️  Row count mismatch! Expected: {}, Got: {}",
+            expected_rows, row_count
+        );
+        println!(
+            "   Missing: {} rows",
+            expected_rows as i64 - row_count as i64
+        );
+    }
     println!();
 
     println!("📊 Memory Analysis:");
