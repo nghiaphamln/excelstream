@@ -300,9 +300,7 @@ impl StreamingReader {
     ///
     /// Parses workbook.xml to get sheet names and their corresponding worksheet paths.
     /// Supports Unicode sheet names.
-    fn load_sheet_info(
-        archive: &mut StreamingZipReader,
-    ) -> Result<(Vec<String>, Vec<String>)> {
+    fn load_sheet_info(archive: &mut StreamingZipReader) -> Result<(Vec<String>, Vec<String>)> {
         let mut sheet_names = Vec::new();
         let mut sheet_ids = Vec::new();
 
@@ -312,76 +310,78 @@ impl StreamingReader {
             .map_err(|e| ExcelError::ReadError(format!("Failed to open workbook.xml: {}", e)))?;
         let xml_data = String::from_utf8_lossy(&xml_data).to_string();
 
-            // Parse <sheet> tags to get names and rIds
-            // Example: <sheet name="Sheet1" sheetId="1" r:id="rId1"/>
-            let mut pos = 0;
-            while let Some(sheet_start) = xml_data[pos..].find("<sheet ") {
-                let sheet_start = pos + sheet_start;
-                if let Some(sheet_end) = xml_data[sheet_start..].find("/>") {
-                    let sheet_end = sheet_start + sheet_end + 2;
-                    let sheet_tag = &xml_data[sheet_start..sheet_end];
+        // Parse <sheet> tags to get names and rIds
+        // Example: <sheet name="Sheet1" sheetId="1" r:id="rId1"/>
+        let mut pos = 0;
+        while let Some(sheet_start) = xml_data[pos..].find("<sheet ") {
+            let sheet_start = pos + sheet_start;
+            if let Some(sheet_end) = xml_data[sheet_start..].find("/>") {
+                let sheet_end = sheet_start + sheet_end + 2;
+                let sheet_tag = &xml_data[sheet_start..sheet_end];
 
-                    // Extract name attribute
-                    if let Some(name_start) = sheet_tag.find("name=\"") {
-                        let name_start = name_start + 6;
-                        if let Some(name_end) = sheet_tag[name_start..].find("\"") {
-                            let name = &sheet_tag[name_start..name_start + name_end];
-                            sheet_names.push(name.to_string());
-                        }
+                // Extract name attribute
+                if let Some(name_start) = sheet_tag.find("name=\"") {
+                    let name_start = name_start + 6;
+                    if let Some(name_end) = sheet_tag[name_start..].find("\"") {
+                        let name = &sheet_tag[name_start..name_start + name_end];
+                        sheet_names.push(name.to_string());
                     }
-
-                    // Extract r:id attribute
-                    if let Some(rid_start) = sheet_tag.find("r:id=\"") {
-                        let rid_start = rid_start + 6;
-                        if let Some(rid_end) = sheet_tag[rid_start..].find("\"") {
-                            let rid = &sheet_tag[rid_start..rid_start + rid_end];
-                            sheet_ids.push(rid.to_string());
-                        }
-                    }
-
-                    pos = sheet_end;
-                } else {
-                    break;
                 }
+
+                // Extract r:id attribute
+                if let Some(rid_start) = sheet_tag.find("r:id=\"") {
+                    let rid_start = rid_start + 6;
+                    if let Some(rid_end) = sheet_tag[rid_start..].find("\"") {
+                        let rid = &sheet_tag[rid_start..rid_start + rid_end];
+                        sheet_ids.push(rid.to_string());
+                    }
+                }
+
+                pos = sheet_end;
+            } else {
+                break;
             }
+        }
         // Now load workbook.xml.rels to map rIds to worksheet paths
         let mut sheet_paths = Vec::new();
-        
+
         let rels_data = archive
             .read_entry_by_name("xl/_rels/workbook.xml.rels")
-            .map_err(|e| ExcelError::ReadError(format!("Failed to open workbook.xml.rels: {}", e)))?;
+            .map_err(|e| {
+                ExcelError::ReadError(format!("Failed to open workbook.xml.rels: {}", e))
+            })?;
         let rels_data = String::from_utf8_lossy(&rels_data).to_string();
 
-            // Map rIds to worksheet paths
-            for rid in &sheet_ids {
-                // Find <Relationship Id="rId1" Target="worksheets/sheet1.xml"/>
-                if let Some(rel_start) = rels_data.find(&format!("Id=\"{}\"", rid)) {
-                    // Find the start of this Relationship tag
-                    let tag_start = rels_data[..rel_start]
-                        .rfind("<Relationship")
-                        .unwrap_or(rel_start.saturating_sub(100));
+        // Map rIds to worksheet paths
+        for rid in &sheet_ids {
+            // Find <Relationship Id="rId1" Target="worksheets/sheet1.xml"/>
+            if let Some(rel_start) = rels_data.find(&format!("Id=\"{}\"", rid)) {
+                // Find the start of this Relationship tag
+                let tag_start = rels_data[..rel_start]
+                    .rfind("<Relationship")
+                    .unwrap_or(rel_start.saturating_sub(100));
 
-                    // Find the end of this Relationship tag
-                    let tag_end = if let Some(end_pos) = rels_data[rel_start..].find("/>") {
-                        rel_start + end_pos + 2
-                    } else {
-                        rels_data.len()
-                    };
+                // Find the end of this Relationship tag
+                let tag_end = if let Some(end_pos) = rels_data[rel_start..].find("/>") {
+                    rel_start + end_pos + 2
+                } else {
+                    rels_data.len()
+                };
 
-                    let rel_tag = &rels_data[tag_start..tag_end];
+                let rel_tag = &rels_data[tag_start..tag_end];
 
-                    // Extract Target from this specific tag
-                    if let Some(target_start) = rel_tag.find("Target=\"") {
-                        let target_start = target_start + 8;
-                        if let Some(target_end) = rel_tag[target_start..].find("\"") {
-                            let target = &rel_tag[target_start..target_start + target_end];
-                            // Target is relative to xl/, e.g., "worksheets/sheet1.xml"
-                            let full_path = format!("xl/{}", target);
-                            sheet_paths.push(full_path);
-                        }
+                // Extract Target from this specific tag
+                if let Some(target_start) = rel_tag.find("Target=\"") {
+                    let target_start = target_start + 8;
+                    if let Some(target_end) = rel_tag[target_start..].find("\"") {
+                        let target = &rel_tag[target_start..target_start + target_end];
+                        // Target is relative to xl/, e.g., "worksheets/sheet1.xml"
+                        let full_path = format!("xl/{}", target);
+                        sheet_paths.push(full_path);
                     }
                 }
             }
+        }
 
         if sheet_names.len() != sheet_paths.len() {
             return Err(ExcelError::ReadError(format!(
@@ -404,7 +404,7 @@ impl StreamingReader {
 pub struct RowIterator<'a> {
     reader: BufReader<Box<dyn Read + 'a>>,
     sst: &'a [String],
-    buffer: String,       // Buffer for reading XML chunks
+    buffer: String,      // Buffer for reading XML chunks
     in_row: bool,        // Whether we're currently inside a <row> tag
     row_content: String, // Buffer for accumulating current row XML
 }
@@ -482,7 +482,7 @@ impl<'a> RowIterator<'a> {
                     if row_end < self.row_content.len() {
                         self.buffer.insert_str(0, &self.row_content[row_end..]);
                     }
-                    
+
                     // Clear and reset
                     self.row_content.clear();
                     self.in_row = false;
@@ -494,7 +494,7 @@ impl<'a> RowIterator<'a> {
                     // If parse fails, continue to next row
                     continue;
                 }
-                
+
                 // Not in row_content, check buffer
                 if !self.buffer.is_empty() {
                     // Append buffer to row_content
@@ -502,7 +502,7 @@ impl<'a> RowIterator<'a> {
                     self.buffer.clear();
                     continue; // Try again
                 }
-                
+
                 // Need more data
                 return None;
             }
@@ -518,19 +518,20 @@ impl<'a> RowIterator<'a> {
             .or_else(|| row_xml[pos..].find("<c>"))
         {
             let cell_start = pos + cell_start;
-            
+
             // Handle both self-closing <c ... /> and <c ...></c>
-            let (cell_end, cell_xml) = if let Some(self_close_pos) = row_xml[cell_start..].find("/>") {
-                let end = cell_start + self_close_pos + 2;
-                let xml = &row_xml[cell_start..end];
-                (end, xml)
-            } else if let Some(close_tag_pos) = row_xml[cell_start..].find("</c>") {
-                let end = cell_start + close_tag_pos + 4;
-                let xml = &row_xml[cell_start..end];
-                (end, xml)
-            } else {
-                break; // Incomplete cell tag
-            };
+            let (cell_end, cell_xml) =
+                if let Some(self_close_pos) = row_xml[cell_start..].find("/>") {
+                    let end = cell_start + self_close_pos + 2;
+                    let xml = &row_xml[cell_start..end];
+                    (end, xml)
+                } else if let Some(close_tag_pos) = row_xml[cell_start..].find("</c>") {
+                    let end = cell_start + close_tag_pos + 4;
+                    let xml = &row_xml[cell_start..end];
+                    (end, xml)
+                } else {
+                    break; // Incomplete cell tag
+                };
 
             // Extract cell reference (e.g., "A1", "B1", "AA1")
             let col_idx = if let Some(r_start) = cell_xml.find("r=\"") {

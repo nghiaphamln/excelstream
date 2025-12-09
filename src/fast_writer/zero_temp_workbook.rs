@@ -25,7 +25,7 @@ pub struct ZeroTempWorkbook {
 impl ZeroTempWorkbook {
     pub fn new(path: &str, compression_level: u32) -> Result<Self> {
         let zip_writer = StreamingZipWriter::new(path, compression_level)?;
-        
+
         Ok(Self {
             zip_writer: Some(zip_writer),
             worksheets: Vec::new(),
@@ -58,8 +58,11 @@ impl ZeroTempWorkbook {
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
 <sheetData>"#
         );
-        
-        self.zip_writer.as_mut().unwrap().write_data(header.as_bytes())?;
+
+        self.zip_writer
+            .as_mut()
+            .unwrap()
+            .write_data(header.as_bytes())?;
         self.in_worksheet = true;
 
         Ok(())
@@ -68,7 +71,7 @@ impl ZeroTempWorkbook {
     pub fn write_row(&mut self, values: &[&str]) -> Result<()> {
         if !self.in_worksheet {
             return Err(crate::error::ExcelError::WriteError(
-                "No worksheet started".to_string()
+                "No worksheet started".to_string(),
             ));
         }
 
@@ -78,14 +81,16 @@ impl ZeroTempWorkbook {
         // Build row XML in buffer
         self.xml_buffer.clear();
         self.xml_buffer.extend_from_slice(b"<row r=\"");
-        self.xml_buffer.extend_from_slice(self.current_row.to_string().as_bytes());
+        self.xml_buffer
+            .extend_from_slice(self.current_row.to_string().as_bytes());
         self.xml_buffer.extend_from_slice(b"\">");
 
         for (col_idx, value) in values.iter().enumerate() {
             let col_letter = Self::column_letter(col_idx as u32 + 1);
             self.xml_buffer.extend_from_slice(b"<c r=\"");
             self.xml_buffer.extend_from_slice(col_letter.as_bytes());
-            self.xml_buffer.extend_from_slice(self.current_row.to_string().as_bytes());
+            self.xml_buffer
+                .extend_from_slice(self.current_row.to_string().as_bytes());
 
             if value.is_empty() {
                 self.xml_buffer.extend_from_slice(b"\"/>");
@@ -95,7 +100,8 @@ impl ZeroTempWorkbook {
                 self.xml_buffer.extend_from_slice(b"</v></c>");
             } else {
                 // Inline string
-                self.xml_buffer.extend_from_slice(b"\" t=\"inlineStr\"><is><t>");
+                self.xml_buffer
+                    .extend_from_slice(b"\" t=\"inlineStr\"><is><t>");
                 Self::write_escaped(&mut self.xml_buffer, value);
                 self.xml_buffer.extend_from_slice(b"</t></is></c>");
             }
@@ -104,7 +110,10 @@ impl ZeroTempWorkbook {
         self.xml_buffer.extend_from_slice(b"</row>");
 
         // Stream to compressor immediately
-        self.zip_writer.as_mut().unwrap().write_data(&self.xml_buffer)?;
+        self.zip_writer
+            .as_mut()
+            .unwrap()
+            .write_data(&self.xml_buffer)?;
 
         Ok(())
     }
@@ -113,7 +122,10 @@ impl ZeroTempWorkbook {
         if self.in_worksheet {
             // Write worksheet footer
             let footer = "</sheetData></worksheet>";
-            self.zip_writer.as_mut().unwrap().write_data(footer.as_bytes())?;
+            self.zip_writer
+                .as_mut()
+                .unwrap()
+                .write_data(footer.as_bytes())?;
             self.in_worksheet = false;
         }
         Ok(())
@@ -140,8 +152,12 @@ impl ZeroTempWorkbook {
     }
 
     fn write_content_types(&mut self) -> Result<()> {
-        self.zip_writer.as_mut().unwrap().start_entry("[Content_Types].xml")?;
-        let mut xml = String::from(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        self.zip_writer
+            .as_mut()
+            .unwrap()
+            .start_entry("[Content_Types].xml")?;
+        let mut xml = String::from(
+            r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
 <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
 <Default Extension="xml" ContentType="application/xml"/>
@@ -149,7 +165,8 @@ impl ZeroTempWorkbook {
 <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
 <Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>
 <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
-<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>"#);
+<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>"#,
+        );
 
         for i in 1..=self.worksheet_count {
             xml.push_str(&format!(
@@ -160,27 +177,41 @@ impl ZeroTempWorkbook {
         }
 
         xml.push_str("\n</Types>");
-        self.zip_writer.as_mut().unwrap().write_data(xml.as_bytes())?;
+        self.zip_writer
+            .as_mut()
+            .unwrap()
+            .write_data(xml.as_bytes())?;
         Ok(())
     }
 
     fn write_rels(&mut self) -> Result<()> {
-        self.zip_writer.as_mut().unwrap().start_entry("_rels/.rels")?;
+        self.zip_writer
+            .as_mut()
+            .unwrap()
+            .start_entry("_rels/.rels")?;
         let xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
 <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
 <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
 <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
 </Relationships>"#;
-        self.zip_writer.as_mut().unwrap().write_data(xml.as_bytes())?;
+        self.zip_writer
+            .as_mut()
+            .unwrap()
+            .write_data(xml.as_bytes())?;
         Ok(())
     }
 
     fn write_workbook(&mut self) -> Result<()> {
-        self.zip_writer.as_mut().unwrap().start_entry("xl/workbook.xml")?;
-        let mut xml = String::from(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        self.zip_writer
+            .as_mut()
+            .unwrap()
+            .start_entry("xl/workbook.xml")?;
+        let mut xml = String::from(
+            r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-<sheets>"#);
+<sheets>"#,
+        );
 
         for (i, name) in self.worksheets.iter().enumerate() {
             xml.push_str(&format!(
@@ -193,14 +224,22 @@ impl ZeroTempWorkbook {
         }
 
         xml.push_str("\n</sheets>\n</workbook>");
-        self.zip_writer.as_mut().unwrap().write_data(xml.as_bytes())?;
+        self.zip_writer
+            .as_mut()
+            .unwrap()
+            .write_data(xml.as_bytes())?;
         Ok(())
     }
 
     fn write_workbook_rels(&mut self) -> Result<()> {
-        self.zip_writer.as_mut().unwrap().start_entry("xl/_rels/workbook.xml.rels")?;
-        let mut xml = String::from(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">"#);
+        self.zip_writer
+            .as_mut()
+            .unwrap()
+            .start_entry("xl/_rels/workbook.xml.rels")?;
+        let mut xml = String::from(
+            r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">"#,
+        );
 
         for i in 1..=self.worksheet_count {
             xml.push_str(&format!(
@@ -219,12 +258,18 @@ impl ZeroTempWorkbook {
             self.worksheet_count + 2
         ));
 
-        self.zip_writer.as_mut().unwrap().write_data(xml.as_bytes())?;
+        self.zip_writer
+            .as_mut()
+            .unwrap()
+            .write_data(xml.as_bytes())?;
         Ok(())
     }
 
     fn write_styles(&mut self) -> Result<()> {
-        self.zip_writer.as_mut().unwrap().start_entry("xl/styles.xml")?;
+        self.zip_writer
+            .as_mut()
+            .unwrap()
+            .start_entry("xl/styles.xml")?;
         let xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
 <numFmts count="0"/>
@@ -233,36 +278,57 @@ impl ZeroTempWorkbook {
 <borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
 <cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/></cellXfs>
 </styleSheet>"#;
-        self.zip_writer.as_mut().unwrap().write_data(xml.as_bytes())?;
+        self.zip_writer
+            .as_mut()
+            .unwrap()
+            .write_data(xml.as_bytes())?;
         Ok(())
     }
 
     fn write_shared_strings(&mut self) -> Result<()> {
-        self.zip_writer.as_mut().unwrap().start_entry("xl/sharedStrings.xml")?;
+        self.zip_writer
+            .as_mut()
+            .unwrap()
+            .start_entry("xl/sharedStrings.xml")?;
         let xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="0" uniqueCount="0"/>
 "#;
-        self.zip_writer.as_mut().unwrap().write_data(xml.as_bytes())?;
+        self.zip_writer
+            .as_mut()
+            .unwrap()
+            .write_data(xml.as_bytes())?;
         Ok(())
     }
 
     fn write_app_props(&mut self) -> Result<()> {
-        self.zip_writer.as_mut().unwrap().start_entry("docProps/app.xml")?;
+        self.zip_writer
+            .as_mut()
+            .unwrap()
+            .start_entry("docProps/app.xml")?;
         let xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">
 <Application>ExcelStream</Application>
 </Properties>"#;
-        self.zip_writer.as_mut().unwrap().write_data(xml.as_bytes())?;
+        self.zip_writer
+            .as_mut()
+            .unwrap()
+            .write_data(xml.as_bytes())?;
         Ok(())
     }
 
     fn write_core_props(&mut self) -> Result<()> {
-        self.zip_writer.as_mut().unwrap().start_entry("docProps/core.xml")?;
+        self.zip_writer
+            .as_mut()
+            .unwrap()
+            .start_entry("docProps/core.xml")?;
         let xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 <dc:creator>ExcelStream</dc:creator>
 </cp:coreProperties>"#;
-        self.zip_writer.as_mut().unwrap().write_data(xml.as_bytes())?;
+        self.zip_writer
+            .as_mut()
+            .unwrap()
+            .write_data(xml.as_bytes())?;
         Ok(())
     }
 

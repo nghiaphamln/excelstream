@@ -7,13 +7,13 @@
 //!
 //! Expected RAM savings: 5-8 MB
 
-use std::fs::File;
-use std::io::{Write, Seek};
-use std::path::Path;
 use crate::error::Result;
+use crc32fast::Hasher as Crc32;
 use flate2::write::DeflateEncoder;
 use flate2::Compression;
-use crc32fast::Hasher as Crc32;
+use std::fs::File;
+use std::io::{Seek, Write};
+use std::path::Path;
 
 /// Entry being written to ZIP
 struct ZipEntry {
@@ -103,7 +103,8 @@ impl StreamingZipWriter {
 
         // Create encoder for this entry
         let counting_writer = CrcCountingWriter::new(self.output.try_clone()?);
-        let encoder = DeflateEncoder::new(counting_writer, Compression::new(self.compression_level));
+        let encoder =
+            DeflateEncoder::new(counting_writer, Compression::new(self.compression_level));
 
         self.current_entry = Some(CurrentEntry {
             name: name.to_string(),
@@ -120,13 +121,13 @@ impl StreamingZipWriter {
             // Update CRC with uncompressed data
             entry.encoder.get_mut().crc.update(data);
             entry.encoder.get_mut().uncompressed_count += data.len() as u64;
-            
+
             // Write to encoder (compresses and writes to output)
             entry.encoder.write_all(data)?;
             Ok(())
         } else {
             Err(crate::error::ExcelError::WriteError(
-                "No entry started".to_string()
+                "No entry started".to_string(),
             ))
         }
     }
@@ -136,7 +137,7 @@ impl StreamingZipWriter {
         if let Some(entry) = self.current_entry.take() {
             // Finish compression
             let counting_writer = entry.encoder.finish()?;
-            
+
             let crc = counting_writer.crc.finalize();
             let compressed_size = counting_writer.compressed_count as u32;
             let uncompressed_size = counting_writer.uncompressed_count as u32;
@@ -175,15 +176,19 @@ impl StreamingZipWriter {
             self.output.write_all(&[8, 0])?; // compression method
             self.output.write_all(&[0, 0, 0, 0])?; // mod time/date
             self.output.write_all(&entry.crc32.to_le_bytes())?;
-            self.output.write_all(&entry.compressed_size.to_le_bytes())?;
-            self.output.write_all(&entry.uncompressed_size.to_le_bytes())?;
-            self.output.write_all(&(entry.name.len() as u16).to_le_bytes())?;
+            self.output
+                .write_all(&entry.compressed_size.to_le_bytes())?;
+            self.output
+                .write_all(&entry.uncompressed_size.to_le_bytes())?;
+            self.output
+                .write_all(&(entry.name.len() as u16).to_le_bytes())?;
             self.output.write_all(&0u16.to_le_bytes())?; // extra len
             self.output.write_all(&0u16.to_le_bytes())?; // file comment len
             self.output.write_all(&0u16.to_le_bytes())?; // disk number start
             self.output.write_all(&0u16.to_le_bytes())?; // internal attrs
             self.output.write_all(&0u32.to_le_bytes())?; // external attrs
-            self.output.write_all(&(entry.local_header_offset as u32).to_le_bytes())?;
+            self.output
+                .write_all(&(entry.local_header_offset as u32).to_le_bytes())?;
             self.output.write_all(entry.name.as_bytes())?;
         }
 
@@ -193,10 +198,14 @@ impl StreamingZipWriter {
         self.output.write_all(&[0x50, 0x4b, 0x05, 0x06])?;
         self.output.write_all(&0u16.to_le_bytes())?; // disk number
         self.output.write_all(&0u16.to_le_bytes())?; // disk with central dir
-        self.output.write_all(&(self.entries.len() as u16).to_le_bytes())?;
-        self.output.write_all(&(self.entries.len() as u16).to_le_bytes())?;
-        self.output.write_all(&(central_dir_size as u32).to_le_bytes())?;
-        self.output.write_all(&(central_dir_offset as u32).to_le_bytes())?;
+        self.output
+            .write_all(&(self.entries.len() as u16).to_le_bytes())?;
+        self.output
+            .write_all(&(self.entries.len() as u16).to_le_bytes())?;
+        self.output
+            .write_all(&(central_dir_size as u32).to_le_bytes())?;
+        self.output
+            .write_all(&(central_dir_offset as u32).to_le_bytes())?;
         self.output.write_all(&0u16.to_le_bytes())?; // comment len
 
         self.output.flush()?;

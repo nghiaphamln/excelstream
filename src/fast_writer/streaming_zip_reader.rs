@@ -38,10 +38,10 @@ impl StreamingZipReader {
     /// Open a ZIP file and read its central directory
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let mut file = BufReader::new(File::open(path)?);
-        
+
         // Find and read central directory
         let entries = Self::read_central_directory(&mut file)?;
-        
+
         Ok(StreamingZipReader { file, entries })
     }
 
@@ -82,7 +82,8 @@ impl StreamingZipReader {
         let extra_len = self.read_u16_le()? as i64;
 
         // Skip filename and extra field
-        self.file.seek(SeekFrom::Current(filename_len + extra_len))?;
+        self.file
+            .seek(SeekFrom::Current(filename_len + extra_len))?;
 
         // Now read the compressed data
         let mut compressed_data = vec![0u8; entry.compressed_size as usize];
@@ -116,7 +117,7 @@ impl StreamingZipReader {
                 crate::error::ExcelError::ReadError(format!("Entry not found: {}", name))
             })?
             .clone();
-        
+
         self.read_entry(&entry)
     }
 
@@ -129,7 +130,7 @@ impl StreamingZipReader {
                 crate::error::ExcelError::ReadError(format!("Entry not found: {}", name))
             })?
             .clone();
-        
+
         self.read_entry_streaming(&entry)
     }
 
@@ -161,7 +162,8 @@ impl StreamingZipReader {
         let extra_len = self.read_u16_le()? as i64;
 
         // Skip filename and extra field
-        self.file.seek(SeekFrom::Current(filename_len + extra_len))?;
+        self.file
+            .seek(SeekFrom::Current(filename_len + extra_len))?;
 
         // Create a reader limited to compressed data size
         let limited_reader = (&mut self.file).take(entry.compressed_size);
@@ -189,7 +191,7 @@ impl StreamingZipReader {
                 crate::error::ExcelError::ReadError(format!("Entry not found: {}", name))
             })?
             .clone();
-        
+
         self.read_entry_streaming(&entry)
     }
 
@@ -197,16 +199,17 @@ impl StreamingZipReader {
     fn read_central_directory(file: &mut BufReader<File>) -> Result<Vec<ZipEntry>> {
         // Find end of central directory record
         let eocd_offset = Self::find_eocd(file)?;
-        
+
         // Seek to EOCD
         file.seek(SeekFrom::Start(eocd_offset))?;
-        
+
         // Read EOCD
         let signature = Self::read_u32_le_static(file)?;
         if signature != END_OF_CENTRAL_DIRECTORY_SIGNATURE {
-            return Err(crate::error::ExcelError::ReadError(
-                format!("Invalid end of central directory signature: 0x{:08x}", signature),
-            ));
+            return Err(crate::error::ExcelError::ReadError(format!(
+                "Invalid end of central directory signature: 0x{:08x}",
+                signature
+            )));
         }
 
         // Skip disk number fields (4 bytes)
@@ -217,10 +220,10 @@ impl StreamingZipReader {
 
         // Read total number of entries (2 bytes)
         let total_entries = Self::read_u16_le_static(file)? as usize;
-        
+
         // Read central directory size (4 bytes)
         let _cd_size = Self::read_u32_le_static(file)?;
-        
+
         // Read central directory offset (4 bytes)
         let cd_offset = Self::read_u32_le_static(file)? as u64;
 
@@ -277,7 +280,7 @@ impl StreamingZipReader {
     /// Find the end of central directory record by scanning from the end of the file
     fn find_eocd(file: &mut BufReader<File>) -> Result<u64> {
         let file_size = file.seek(SeekFrom::End(0))?;
-        
+
         // EOCD is at least 22 bytes, search last 65KB (max comment size + EOCD)
         let search_start = file_size.saturating_sub(65557);
         file.seek(SeekFrom::Start(search_start))?;

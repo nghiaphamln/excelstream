@@ -8,11 +8,11 @@
 
 pub mod memory;
 pub mod shared_strings;
+pub mod streaming_zip_reader;
+pub mod streaming_zip_writer;
 pub mod ultra_low_memory;
 pub mod worksheet;
 pub mod xml_writer;
-pub mod streaming_zip_writer;
-pub mod streaming_zip_reader;
 pub mod zero_temp_workbook;
 
 use crate::error::Result;
@@ -20,8 +20,8 @@ use std::path::Path;
 
 pub use memory::{create_workbook_auto, create_workbook_with_profile, MemoryProfile};
 pub use ultra_low_memory::UltraLowMemoryWorkbook;
-pub use zero_temp_workbook::ZeroTempWorkbook;
 pub use worksheet::FastWorksheet;
+pub use zero_temp_workbook::ZeroTempWorkbook;
 
 /// Create a fast Excel writer optimized for large datasets
 ///
