@@ -48,6 +48,18 @@ pub enum ExcelError {
     /// Feature not supported
     #[error("Feature not supported: {0}")]
     NotSupported(String),
+
+    /// Invalid state or operation
+    #[error("Invalid state: {0}")]
+    InvalidState(String),
+
+    /// File not found
+    #[error("File not found: {0}")]
+    FileNotFound(String),
+
+    /// ZIP error
+    #[error("ZIP error: {0}")]
+    ZipError(String),
 }
 
 // Note: std::io::Error is already mapped via the `IoError(#[from] std::io::Error)` variant above.

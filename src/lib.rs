@@ -68,6 +68,13 @@ pub mod streaming_reader;
 pub mod types;
 pub mod writer;
 
+// Cloud storage integration (optional)
+#[cfg(any(feature = "cloud-s3", feature = "cloud-gcs", feature = "cloud-azure"))]
+pub mod cloud;
+
+// Incremental append mode
+pub mod append;
+
 pub use error::{ExcelError, Result};
 pub use streaming_reader::StreamingReader as ExcelReader; // Re-export for backward compatibility
 pub use types::{Cell, CellStyle, CellValue, ProtectionOptions, Row, StyledCell};

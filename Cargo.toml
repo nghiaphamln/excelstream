@@ -1,6 +1,6 @@
 [package]
 name = "excelstream"
-version = "0.9.1"
+version = "0.10.0"
 edition = "2021"
 authors = ["Ton That Vu <ttvuhm@gmail.com>"]
 description = "High-performance streaming Excel library - Read/write large XLSX files with ultra-low memory (2.7 MB for any size)"
@@ -34,6 +34,11 @@ tokio-postgres = { version = "0.7", features = ["with-chrono-0_4"], optional = t
 deadpool-postgres = { version = "0.14", optional = true }
 tokio = { version = "1", features = ["full"], optional = true }
 
+# Cloud storage dependencies (optional)
+aws-config = { version = "1.0", optional = true }
+aws-sdk-s3 = { version = "1.0", optional = true }
+tempfile = { version = "3.8", optional = true }
+
 [dev-dependencies]
 tempfile = "3.8"
 criterion = "0.5"
@@ -44,6 +49,9 @@ serde = ["dep:serde"]
 parallel = ["dep:rayon"]
 postgres = ["dep:postgres"]
 postgres-async = ["dep:tokio-postgres", "dep:deadpool-postgres", "dep:tokio"]
+cloud-s3 = ["dep:aws-config", "dep:aws-sdk-s3", "dep:tokio", "dep:tempfile"]
+cloud-gcs = []  # Placeholder for future
+cloud-azure = []  # Placeholder for future
 
 [[bench]]
 name = "streaming_benchmark"

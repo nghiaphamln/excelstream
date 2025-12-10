@@ -1,463 +1,575 @@
-# ExcelStream Improvement Plan
+# ExcelStream Improvement Plan - REVISED 2025
 
-This document outlines the planned improvements for the excelstream library based on comprehensive code review.
+This document outlines the **next-generation improvements** for excelstream library, focusing on **unique, high-impact features** that leverage our ultra-low memory streaming architecture.
 
-## Current Status (v0.3.0)
+## Current Status (v0.9.1)
 
-**Strengths:**
-- ✅ Excellent performance (30K-45K rows/sec throughput)
-- ✅ Streaming with constant ~80MB memory usage
-- ✅ Good test coverage (50+ tests: 16 integration + 21 doc + 19 unit)
-- ✅ Comprehensive documentation
-- ✅ Rich examples (23 examples)
-- ✅ Formula support
-- ✅ Cell formatting & styling (14 predefined styles)
-- ✅ Context-rich error messages
+**Core Strengths:**
+- ✅ **World-class memory efficiency**: 2.7 MB constant memory (any file size!)
+- ✅ **High performance**: 31-69K rows/sec throughput
+- ✅ **Production-tested**: 430K+ rows real-world usage
+- ✅ **Streaming architecture**: Zero temp files (v0.9.0)
+- ✅ **Rich features**: Styling (14 styles), formulas, protection, merging
+- ✅ **Comprehensive docs**: 28+ examples, full API documentation
 
 **Completed Phases:**
-- ✅ Phase 1 (v0.2.1): Code quality fixes, basic formatting
-- ✅ Phase 2 (v0.2.2): Formula support, improved error messages
-- ✅ Phase 3 (v0.3.0): Cell formatting & styling API
+- ✅ v0.8.0: Custom XML parser (removed calamine dependency)
+- ✅ v0.9.0: Zero-temp streaming ZIP writer (84% memory reduction)
+- ✅ v0.9.1: Cell styling + worksheet protection fixed
 
 ---
 
-## PHASE 1 - Immediate Fixes (v0.2.1) ✅ COMPLETED
+## 🚀 NEW VISION: Cloud-Native Big Data Excel Library
 
-**Target: Fix critical code quality and add basic missing features**
+**Goal**: Make ExcelStream the **go-to library** for:
+- Cloud-native data pipelines (S3, GCS, Azure)
+- Big data processing (Parquet, Arrow, streaming databases)
+- Real-time data exports (incremental updates)
+- AI/ML workflows (Pandas, Polars integration)
 
-### 1.1 Code Quality Fixes ✓
-
-- [x] Fix unused `mut` in [worksheet.rs:227](src/fast_writer/worksheet.rs#L227)
-- [x] Fix needless borrow in [reader.rs:71,104,121](src/reader.rs)
-- [x] Fix unnecessary cast in [reader.rs:141](src/reader.rs#L141)
-- [x] Fix needless borrows in writer.rs tests
-- [x] Fix PI constant usage in [writer.rs:367](src/writer.rs#L367)
-
-### 1.2 Documentation Fixes ✓
-
-- [x] Fix package name in [lib.rs:1](src/lib.rs#L1) (rust-excelize → excelstream)
-
-### 1.3 Error Handling Cleanup ✓
-
-- [x] Remove unused `XlsxWriterError` variant from [error.rs](src/error.rs)
-- [x] Clean up outdated error documentation
-
-### 1.4 Basic Formatting Support
-
-**Priority: HIGH**
-
-- [x] Implement bold header formatting ✅ (Completed in Phase 3)
-  - [x] Add `CellStyle` enum with style properties (bold, italic, colors, borders)
-  - [x] Modify FastWorkbook to support styles.xml generation
-  - [x] Add `write_header_bold()` to apply bold formatting
-
-- [ ] Implement column width support ⏸️ (Deferred to Phase 4)
-  - Add column width tracking to FastWorksheet
-  - Generate proper `<col>` elements in worksheet XML
-  - Make `set_column_width()` functional (currently no-op)
-
-### 1.5 Testing
-
-- [x] Verify all clippy warnings are resolved
-- [x] Run full test suite
-- [ ] Add tests for new formatting features
-
-**Estimated Time:** 2-4 hours
-**Complexity:** Low-Medium
+**Differentiation**: Generic Excel libraries focus on UI features (charts, images). We focus on **data pipeline excellence**.
 
 ---
 
-## PHASE 2 - Short Term (v0.2.2) ✅ COMPLETED
+## PHASE 4 - Cloud-Native Features (v0.10.0) 🔥 PRIORITY
 
-**Target: Essential Excel features**
+**Target**: Streaming to/from cloud storage without local files
 
-### 2.1 Formula Support ✅
+### 4.1 S3/Cloud Storage Direct Streaming ⭐⭐⭐⭐⭐
 
-- [x] Added `Formula(String)` variant to CellValue enum
-- [x] Support for writing Excel formulas in cells
-- [x] Formulas calculate correctly when opened in Excel
-- [x] Example: `write_row_typed(&[CellValue::Formula("=SUM(A1:A10)".into())])`
+**Status**: 🔜 Next up
 
-### 2.2 Cell Merging
+**Problem**: Current workflow requires local file → upload to S3:
+```rust
+// ❌ Current: Write to disk then upload
+let mut writer = ExcelWriter::new("temp.xlsx")?;
+writer.write_rows(&data)?;
+writer.save()?;
+s3_client.upload("temp.xlsx", "s3://bucket/report.xlsx").await?;
+fs::remove_file("temp.xlsx")?; // Waste disk space!
+```
 
-_Deferred to Phase 4 - Not essential for v0.2.2_
+**Solution**: Stream directly to cloud storage:
+```rust
+// ✅ New: Stream directly to S3 - NO local file!
+use excelstream::cloud::S3ExcelWriter;
 
-### 2.3 Improved Error Messages ✅
+let mut writer = S3ExcelWriter::new()
+    .bucket("my-bucket")
+    .key("reports/monthly.xlsx")
+    .region("us-east-1")
+    .build()
+    .await?;
 
-- [x] Added context-rich error messages with debugging info
-- [x] Better error descriptions for common failures
-- [x] Sheet validation errors with available sheets listed
+for row in database.stream_rows() {
+    writer.write_row_typed(&row)?;
+}
 
-### 2.4 Additional Tests ✅
+writer.save().await?; // Upload multipart stream to S3
+```
 
-- [x] Edge case tests (empty strings, special characters)
-- [x] XML escaping tests
-- [x] Formula tests
-- [x] Integration tests for full workflows
+**Benefits**:
+- ✅ Zero disk usage (perfect for Lambda/containers)
+- ✅ Works in read-only filesystems
+- ✅ Multipart upload for large files
+- ✅ Same 2.7 MB memory guarantee
 
-### 2.5 Dependency Updates
+**Implementation**:
+- [ ] `CloudWriter` trait for generic cloud storage
+- [ ] S3 backend using `aws-sdk-s3`
+- [ ] Multipart upload with streaming chunks
+- [ ] GCS backend (optional)
+- [ ] Azure Blob backend (optional)
+- [ ] Local filesystem backend (for testing)
 
-- [x] Dependencies reviewed and up to date
+**Estimated Time**: 2-3 weeks
+**Complexity**: Medium-High
+**Impact**: 🔥 **Game changer** for serverless/cloud workflows
 
 ---
 
-## PHASE 3 - Medium Term (v0.3.0) ✅ COMPLETED
-
-**Target: Cell Formatting & Styling**
-
-### 3.1 Cell Formatting & Styling API ✅
-
-Implemented **14 predefined cell styles** for common use cases:
+### 4.2 Cloud Storage Reader
 
 ```rust
-pub enum CellStyle {
-    Default,           // No formatting
-    HeaderBold,        // Bold text for headers
-    NumberInteger,     // #,##0
-    NumberDecimal,     // #,##0.00
-    NumberCurrency,    // $#,##0.00
-    NumberPercentage,  // 0.00%
-    DateDefault,       // MM/DD/YYYY
-    DateTimestamp,     // MM/DD/YYYY HH:MM:SS
-    TextBold,          // Bold emphasis
-    TextItalic,        // Italic notes
-    HighlightYellow,   // Yellow background
-    HighlightGreen,    // Green background
-    HighlightRed,      // Red background
-    BorderThin,        // Thin borders
-}
+use excelstream::cloud::S3ExcelReader;
 
-pub struct StyledCell {
-    pub value: CellValue,
-    pub style: CellStyle,
-}
+// Stream from S3 - constant memory!
+let mut reader = S3ExcelReader::new()
+    .bucket("analytics")
+    .key("data/sales_2024.xlsx")
+    .build()
+    .await?;
 
-impl ExcelWriter {
-    // Write row with styled cells
-    pub fn write_row_styled(&mut self, cells: &[(CellValue, CellStyle)]) -> Result<()>;
-
-    // Write header with bold formatting
-    pub fn write_header_bold<I, S>(&mut self, headers: I) -> Result<()>;
-
-    // Write row with uniform style
-    pub fn write_row_with_style(&mut self, values: &[CellValue], style: CellStyle) -> Result<()>;
+for row in reader.rows("Sheet1")? {
+    // Process 1GB+ file with only 12 MB RAM!
 }
 ```
 
-**Features:**
-- [x] 14 predefined styles covering common use cases
-- [x] Constant memory usage (~80MB) maintained
-- [x] Complete styles.xml generation with fonts, fills, borders, number formats
-- [x] Easy-to-use API with convenience methods
-- [x] Full example in `examples/cell_formatting.rs`
-- [x] Comprehensive documentation
+**Benefits**:
+- ✅ Process cloud files without downloading
+- ✅ Constant memory for any S3 file size
+- ✅ Range requests for efficient streaming
 
-**Design Decision:** Pre-defined styles approach chosen over dynamic style builder for v0.3.0:
-- ✅ Simpler implementation
-- ✅ Predictable memory usage
-- ✅ Covers 80% of use cases
-- ✅ Fast - no dynamic style tracking
-- ✅ Easy to extend later with dynamic styles in v0.4.0+
-
-### 3.2 Parallel Reading Support
-
-_Deferred to Phase 4 - Focus on styling for v0.3.0_
-
-### 3.3 Data Validation
-
-_Deferred to Phase 4_
-
-### 3.4 Ergonomic API Improvements
-
-_Deferred to Phase 4_
-
-### 3.5 Performance Optimizations
-
-- [x] Maintained streaming performance with styling
-- [x] No regression in write speeds
-- [x] Memory stays constant ~80MB
+**Estimated Time**: 1-2 weeks
+**Complexity**: Medium
 
 ---
 
-## PHASE 4 - Long Term (v0.4.0+) 🔜 NEXT
+## PHASE 5 - Incremental Updates (v0.10.0) ⭐⭐⭐⭐⭐
 
-**Target: Advanced Excel features**
+**Target**: Append/update existing files without full rewrite
 
-**Priority Items for v0.4.0:**
-1. Dynamic Style Builder (custom colors, fonts, combinations)
-2. Cell Merging
-3. Column Width & Row Height
-4. Data Validation
+### 5.1 Incremental Append Mode 🔥
 
-### 4.1 Conditional Formatting
+**Status**: 🔜 High priority
 
+**Problem**: Current workflow requires full rewrite:
 ```rust
-pub enum ConditionalFormat {
-    ColorScale {
-        min_color: Color,
-        mid_color: Option<Color>,
-        max_color: Color,
-    },
-    DataBar {
-        color: Color,
-        show_value: bool,
-    },
-    IconSet {
-        icons: IconSetType,
-        reverse: bool,
-    },
-    CellValue {
-        operator: ComparisonOperator,
-        value: CellValue,
-        format: CellStyle,
-    },
-}
+// ❌ Current: Must read entire file, modify, rewrite
+let mut reader = ExcelReader::open("monthly_log.xlsx")?;
+let mut rows: Vec<_> = reader.rows("Log")?.collect();
+rows.push(new_row); // Add new data
 
-impl ExcelWriter {
-    pub fn add_conditional_format(&mut self, range: &str,
-                                   format: ConditionalFormat) -> Result<()>;
+let mut writer = ExcelWriter::new("monthly_log.xlsx")?; // Overwrite!
+for row in rows {
+    writer.write_row(&row)?;
 }
+writer.save()?; // Full rewrite - slow for large files!
 ```
 
-### 4.2 Charts
-
+**Solution**: Append mode without reading old data:
 ```rust
-pub enum ChartType {
-    Line,
-    Column,
-    Bar,
-    Pie,
-    Scatter,
-    Area,
-}
+// ✅ New: Append to existing file - no full rewrite!
+use excelstream::append::AppendableExcelWriter;
 
-pub struct Chart {
-    chart_type: ChartType,
-    series: Vec<ChartSeries>,
-    title: Option<String>,
-    x_axis: AxisOptions,
-    y_axis: AxisOptions,
-}
+let mut writer = AppendableExcelWriter::open("monthly_log.xlsx")?;
+writer.select_sheet("Log")?;
 
-impl ExcelWriter {
-    pub fn insert_chart(&mut self, sheet: &str, row: u32, col: u32,
-                        chart: &Chart) -> Result<()>;
-}
+// Append new rows - only writes NEW data!
+writer.append_row(&["2024-12-10", "New entry", "Active"])?;
+writer.save()?; // Only updates modified parts - FAST!
 ```
 
-### 4.3 Images
+**Benefits**:
+- ✅ **10-100x faster** for large files (no full rewrite)
+- ✅ Constant memory (doesn't load existing data)
+- ✅ Perfect for logs, daily updates, incremental ETL
+- ✅ Atomic operations (safe for concurrent access)
 
-```rust
-impl ExcelWriter {
-    pub fn insert_image(&mut self, sheet: &str, row: u32, col: u32,
-                        path: &str) -> Result<()>;
-    pub fn insert_image_with_options(&mut self, sheet: &str, row: u32, col: u32,
-                                      path: &str, options: ImageOptions) -> Result<()>;
-}
-```
+**Use Cases**:
+- Daily data appends to monthly/yearly reports
+- Real-time logging to Excel
+- Incremental ETL pipelines
+- Multi-user data collection (with locking)
 
-### 4.4 Rich Text
+**Implementation**:
+- [ ] Parse ZIP central directory to locate sheet XML
+- [ ] Extract last row number from sheet.xml
+- [ ] Modify sheet.xml with new rows (streaming)
+- [ ] Update ZIP central directory (replace sheet entry)
+- [ ] Preserve styles, formulas, formatting
+- [ ] File locking for safe concurrent access
 
-```rust
-pub struct RichText {
-    runs: Vec<TextRun>,
-}
-
-pub struct TextRun {
-    text: String,
-    font: FontStyle,
-}
-
-impl ExcelWriter {
-    pub fn write_rich_text(&mut self, row: u32, col: u32,
-                           rich_text: &RichText) -> Result<()>;
-}
-```
-
-### 4.5 Worksheet Protection
-
-```rust
-pub struct ProtectionOptions {
-    pub password: Option<String>,
-    pub select_locked_cells: bool,
-    pub select_unlocked_cells: bool,
-    pub format_cells: bool,
-    pub format_columns: bool,
-    pub format_rows: bool,
-}
-
-impl ExcelWriter {
-    pub fn protect_sheet(&mut self, options: ProtectionOptions) -> Result<()>;
-}
-```
-
-**Estimated Time:** 8-12 weeks
-**Complexity:** Very High
+**Estimated Time**: 3-4 weeks
+**Complexity**: High (ZIP manipulation complexity)
+**Impact**: 🔥 **No Rust library does this!**
 
 ---
 
-## PHASE 5 - Repository & Publishing
+### 5.2 In-Place Cell Updates
 
-### 5.1 CI/CD Setup
-
-```yaml
-# .github/workflows/ci.yml
-- Automated testing on push/PR
-- Clippy checks
-- Format checks
-- Benchmark tracking
-- Documentation deployment
-```
-
-### 5.2 Additional Badges
-
-```markdown
-[![Crates.io](https://img.shields.io/crates/v/excelstream.svg)]
-[![Documentation](https://docs.rs/excelstream/badge.svg)]
-[![Downloads](https://img.shields.io/crates/d/excelstream.svg)]
-[![CI](https://github.com/KSD-CO/excelstream/workflows/CI/badge.svg)]
-```
-
-### 5.3 Documentation Improvements
-
-- [ ] Create CHANGELOG.md
-- [ ] Add CONTRIBUTING.md guidelines
-- [ ] API documentation examples
-- [ ] Migration guides for major versions
-- [ ] Performance tuning guide
-
-### 5.4 Community
-
-- [ ] Set up issue templates
-- [ ] PR templates
-- [ ] Code of conduct
-- [ ] Security policy
-
-**Estimated Time:** 1-2 weeks
-**Complexity:** Low
-
----
-
-## Testing Strategy
-
-### Unit Tests
-- Test each module independently
-- Cover edge cases and error conditions
-- Test public APIs
-
-### Integration Tests
-- Test full read/write workflows
-- Test multi-sheet operations
-- Test large dataset handling
-
-### Property-Based Tests
 ```rust
-use proptest::prelude::*;
+// Update specific cells without rewriting entire file
+let mut updater = ExcelUpdater::open("inventory.xlsx")?;
 
-proptest! {
-    #[test]
-    fn roundtrip_arbitrary_data(rows: Vec<Vec<String>>) {
-        // Write and read back, should match
+updater.update_cell("Stock", "B5", CellValue::Int(150))?;
+updater.update_range("Stock", "D2:D100", |cell| {
+    // Recalculate prices with +10% tax
+    if let CellValue::Float(price) = cell {
+        CellValue::Float(price * 1.1)
+    } else {
+        cell
     }
+})?;
+
+updater.save()?; // Only modified cells written
+```
+
+**Estimated Time**: 2-3 weeks
+**Complexity**: High
+
+---
+
+## PHASE 6 - Big Data Integration (v0.11.0)
+
+**Target**: Seamless interop with modern data formats
+
+### 6.1 Partitioned Dataset Export
+
+```rust
+// Auto-split large exports (Excel limit: 1M rows/sheet)
+let mut writer = PartitionedExcelWriter::new("output/sales")
+    .partition_by_rows(1_000_000) // 1M rows per file
+    .or_partition_by_size("100MB")
+    .with_naming_pattern("{base}_part_{index}.xlsx")
+    .build()?;
+
+// Write 10M rows → Creates 10 files automatically
+for row in database.query("SELECT * FROM sales") {
+    writer.write_row_typed(&row)?; // Auto-creates new files
+}
+
+writer.save()?;
+// Result:
+// sales_part_0.xlsx (1M rows)
+// sales_part_1.xlsx (1M rows)
+// ...
+// sales_part_9.xlsx (1M rows)
+```
+
+**Estimated Time**: 1-2 weeks
+**Complexity**: Medium
+
+---
+
+### 6.2 Parquet/Arrow Conversion
+
+```rust
+// Stream from Parquet → Excel (constant memory)
+ExcelConverter::from_parquet("big_data.parquet")
+    .to_excel("report.xlsx")
+    .with_compression(6)
+    .stream()?; // No intermediate loading!
+
+// Multi-format merge
+ExcelConverter::merge()
+    .add_csv("sales.csv", "Sales")
+    .add_parquet("metrics.parquet", "Metrics")
+    .add_json_lines("logs.jsonl", "Logs")
+    .to_excel("combined.xlsx")
+    .stream()?;
+```
+
+**Estimated Time**: 2-3 weeks
+**Complexity**: Medium-High
+
+---
+
+### 6.3 Pandas DataFrame Interop (PyO3)
+
+```rust
+// Python binding for streaming pandas DataFrames
+#[pyfunction]
+fn dataframe_to_excel(df: &PyAny, path: &str) -> PyResult<()> {
+    let mut writer = ExcelWriter::new(path)?;
+
+    // Stream directly from pandas - no intermediate conversion
+    for row in df.iter_rows()? {
+        writer.write_row_py(row)?;
+    }
+
+    writer.save()?;
+    Ok(())
 }
 ```
 
-### Performance Tests
-- Benchmark critical operations
-- Memory usage tests
-- Streaming validation tests
-
-### Compatibility Tests
-- Test Excel compatibility
-- Test LibreOffice compatibility
-- Test different Excel versions
+**Benefits**: AI/ML pipelines, data science workflows
+**Estimated Time**: 2-3 weeks
+**Complexity**: Medium
 
 ---
 
-## Performance Goals
+## PHASE 7 - Developer Experience (v0.11.0)
 
-### Current Performance (v0.3.0)
-- ExcelWriter.write_row(): 36,870 rows/s
-- ExcelWriter.write_row_typed(): 42,877 rows/s
-- ExcelWriter.write_row_styled(): ~42,000 rows/s (< 5% overhead)
-- FastWorkbook direct: 44,753 rows/s
-- Memory: ~80MB constant (with styling)
+### 7.1 Schema-First Code Generation
 
-### Target Performance (v0.4.0+)
-- Maintain or improve write speeds
-- Keep memory usage under 100MB for streaming
-- Parallel reading: 2-4x speedup on multi-core systems
-- Zero-copy optimizations where possible
-- Dynamic style builder with < 10% overhead
+```rust
+// Derive macro for type-safe Excel exports
+#[derive(ExcelSchema)]
+#[excel(sheet_name = "Invoices")]
+struct Invoice {
+    #[excel(column = "A", header = "ID", style = "Bold")]
+    id: i64,
+
+    #[excel(column = "B", header = "Amount", style = "Currency")]
+    amount: f64,
+
+    #[excel(column = "C", header = "Date", format = "yyyy-mm-dd")]
+    date: NaiveDate,
+
+    #[excel(skip)] // Don't export this field
+    internal_note: String,
+}
+
+// Auto-generated writer with compile-time safety
+let mut writer = Invoice::excel_writer("invoices.xlsx")?;
+writer.write(&invoice)?; // Type-safe, auto-styled!
+```
+
+**Estimated Time**: 3-4 weeks
+**Complexity**: High (proc macros)
 
 ---
 
-## Breaking Changes Policy
+### 7.2 SQL-Like Query API
 
-### Semantic Versioning
-- Patch (0.2.x): Bug fixes, no API changes
-- Minor (0.x.0): New features, backward compatible
-- Major (x.0.0): Breaking API changes
+```rust
+// Query Excel files like a database
+let result = ExcelQuery::from("sales.xlsx")
+    .select(&["Product", "SUM(Amount) as Total"])
+    .where_clause("Category = 'Electronics'")
+    .group_by("Product")
+    .order_by("Total DESC")
+    .limit(10)
+    .execute()?;
 
-### Deprecation Strategy
-- Deprecate old APIs in minor version
-- Keep deprecated APIs for at least one minor version
-- Document migration path clearly
-- Remove in next major version
+result.to_excel("top_products.xlsx")?;
+```
+
+**Estimated Time**: 4-5 weeks
+**Complexity**: Very High
+
+---
+
+## PHASE 8 - Performance & Concurrency (v0.12.0)
+
+### 8.1 Parallel Batch Writer
+
+```rust
+use rayon::prelude::*;
+
+let writer = ParallelExcelWriter::new("output.xlsx")?
+    .with_threads(8)
+    .build()?;
+
+// Process 10M rows in parallel
+(0..10_000_000)
+    .into_par_iter()
+    .map(|i| generate_row(i))
+    .write_to_excel(&mut writer)?;
+
+writer.save()?; // Auto-merge batches
+```
+
+**Expected**: 5-8x speedup on multi-core systems
+**Estimated Time**: 2-3 weeks
+
+---
+
+### 8.2 Streaming Metrics & Observability
+
+```rust
+let mut writer = ExcelWriter::new("data.xlsx")?
+    .with_progress_callback(|metrics| {
+        tracing::info!(
+            rows = metrics.rows_written,
+            memory_mb = metrics.memory_mb,
+            throughput = metrics.rows_per_sec,
+            "Export progress"
+        );
+    })?;
+```
+
+**Estimated Time**: 1 week
+**Complexity**: Low
+
+---
+
+## PHASE 9 - Advanced Excel Features (v1.0.0)
+
+**Note**: These are traditional Excel features, lower priority than our unique cloud/streaming features.
+
+### 9.1 Dynamic Custom Styling
+
+```rust
+let custom_style = CellStyleBuilder::new()
+    .background_color(Color::Rgb(255, 100, 50))
+    .font_color(Color::Rgb(255, 255, 255))
+    .font_size(14)
+    .bold()
+    .border(BorderStyle::Double, Color::Black)
+    .build();
+```
+
+**Estimated Time**: 2-3 weeks
+
+---
+
+### 9.2 Conditional Formatting
+
+```rust
+writer.add_conditional_format(
+    "B2:B1000",
+    ConditionalFormat::DataBar {
+        color: Color::Blue,
+        show_value: true,
+    }
+)?;
+
+writer.add_conditional_format(
+    "C2:C1000",
+    ConditionalFormat::ColorScale {
+        min: Color::Red,
+        mid: Some(Color::Yellow),
+        max: Color::Green,
+    }
+)?;
+```
+
+**Estimated Time**: 3-4 weeks
+
+---
+
+### 9.3 Charts & Images
+
+```rust
+let chart = Chart::new(ChartType::ColumnClustered)
+    .add_series("Sales", "A2:A10", "B2:B10")
+    .title("Q4 2024 Results");
+
+writer.insert_chart(0, (5, 5), &chart)?;
+writer.insert_image("Dashboard", 2, 5, "logo.png")?;
+```
+
+**Estimated Time**: 4-6 weeks
+
+---
+
+### 9.4 Data Validation & Hyperlinks
+
+```rust
+// Dropdown lists
+writer.add_data_validation(
+    "D2:D1000",
+    DataValidation::List(&["Active", "Pending", "Inactive"])
+)?;
+
+// Hyperlinks
+writer.write_cell_link(
+    2, 3,
+    "Click here",
+    LinkTarget::Url("https://example.com")
+)?;
+```
+
+**Estimated Time**: 1-2 weeks each
+
+---
+
+## Roadmap Timeline
+
+```
+v0.10.0 (Q1 2025 - 2-3 months):
+├── S3/Cloud Storage Direct Streaming ⭐⭐⭐⭐⭐ [Priority #1]
+├── Incremental Append Mode ⭐⭐⭐⭐⭐ [Priority #2]
+├── Cloud Storage Reader ⭐⭐⭐⭐
+└── Streaming Metrics/Observability ⭐⭐⭐
+
+v0.11.0 (Q2 2025 - 2-3 months):
+├── Partitioned Dataset Export ⭐⭐⭐⭐
+├── Parquet/Arrow Conversion ⭐⭐⭐⭐
+├── Schema Code Generation ⭐⭐⭐⭐
+└── In-Place Cell Updates ⭐⭐⭐
+
+v0.12.0 (Q3 2025 - 2-3 months):
+├── Pandas Interop (PyO3) ⭐⭐⭐⭐
+├── Parallel Batch Writer ⭐⭐⭐⭐
+├── SQL Query API ⭐⭐⭐⭐
+└── Dynamic Custom Styling ⭐⭐⭐
+
+v1.0.0 (Q4 2025 - 3-4 months):
+├── Conditional Formatting ⭐⭐⭐
+├── Charts ⭐⭐⭐
+├── Images ⭐⭐⭐
+└── Data Validation ⭐⭐⭐
+```
 
 ---
 
 ## Success Metrics
 
-### Code Quality
-- Zero clippy warnings with `-D warnings`
-- Test coverage > 80%
-- All examples working
-- Documentation for all public APIs
+### Adoption Metrics
+- 🎯 1,000+ GitHub stars (currently ~50)
+- 🎯 10,000+ monthly downloads on crates.io
+- 🎯 Used in production by 100+ companies
+- 🎯 3+ featured blog posts/articles
 
-### Performance
-- High throughput: 30K-45K rows/sec for all operations
-- Memory usage stays constant (~80MB) for streaming
-- No performance regressions
+### Technical Excellence
+- ✅ Zero clippy warnings
+- ✅ >85% test coverage
+- ✅ All examples working
+- ✅ <10ms response time for issues
+- ✅ Monthly releases during active development
 
-### Community
-- GitHub stars growth
-- crates.io downloads
-- Issue response time < 48 hours
-- Regular releases (monthly for active development)
+### Performance Goals
+- ✅ Maintain 2.7 MB memory for streaming writes
+- ✅ <15 MB memory for streaming reads
+- 🎯 50K+ rows/sec write throughput
+- 🎯 5-8x speedup with parallel writer
+- 🎯 S3 streaming within 10% of local disk speed
 
 ---
 
-## Dependencies Philosophy
+## Why This Plan is Better
 
-### Core Dependencies (minimal)
-- calamine: Excel reading
-- zip: ZIP compression
-- thiserror: Error handling
+**Old Plan Focus**: Charts, images, rich text (generic Excel features)
+- ❌ Commodity features every library has
+- ❌ Doesn't leverage our memory efficiency strength
+- ❌ Limited market differentiation
 
-### Optional Dependencies
-- serde: Serialization support
-- rayon: Parallel processing
-- chrono: Date/time handling (for examples)
+**New Plan Focus**: Cloud-native, big data, streaming (unique features)
+- ✅ **No other Rust library** does S3 direct streaming
+- ✅ **No library** does incremental append (ZIP modification)
+- ✅ Leverages our ultra-low memory architecture
+- ✅ Targets modern data engineering workflows
+- ✅ Aligns with cloud/serverless/Kubernetes trends
 
-### Dev Dependencies
-- tempfile: Testing
-- criterion: Benchmarking
-- proptest: Property-based testing
+**Market Positioning**:
+- Old plan: "Another Excel library with charts"
+- New plan: **"The Excel library for cloud-native data pipelines"**
+
+---
+
+## Dependencies Strategy
+
+### New Dependencies (Optional)
+```toml
+[dependencies]
+# Cloud storage (optional features)
+aws-sdk-s3 = { version = "1.0", optional = true }
+google-cloud-storage = { version = "0.16", optional = true }
+azure_storage_blobs = { version = "0.18", optional = true }
+
+# Big data formats (optional)
+parquet = { version = "51.0", optional = true }
+arrow = { version = "51.0", optional = true }
+
+# Python binding (optional)
+pyo3 = { version = "0.20", optional = true }
+
+[features]
+cloud-s3 = ["dep:aws-sdk-s3"]
+cloud-gcs = ["dep:google-cloud-storage"]
+cloud-azure = ["dep:azure_storage_blobs"]
+big-data = ["dep:parquet", "dep:arrow"]
+python = ["dep:pyo3"]
+```
 
 ---
 
 ## Notes
 
-- Maintain backward compatibility within minor versions
-- Keep streaming as the core feature
-- Performance is a key differentiator
-- Memory efficiency is non-negotiable
-- Excel compatibility must be validated
-- Documentation is as important as code
+- **Priority**: Cloud streaming > Incremental append > Big data > Traditional Excel features
+- **Philosophy**: Solve hard problems others won't (ZIP modification, streaming S3)
+- **Target audience**: Data engineers, DevOps, cloud-native developers
+- **Differentiation**: Memory efficiency + cloud integration = unique value prop
 
 ---
 
-**Last Updated:** 2024-12-03
-**Version:** v0.3.0
-**Next Milestone:** v0.4.0 (Phase 4 - Advanced features: dynamic styles, cell merging, charts)
+**Last Updated:** 2024-12-10
+**Current Version:** v0.9.1
+**Next Milestone:** v0.10.0 (S3 Streaming + Incremental Append)
+
+---
+
+**Let's build the future of cloud-native Excel processing! 🚀**
