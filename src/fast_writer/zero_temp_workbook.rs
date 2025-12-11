@@ -99,12 +99,9 @@ impl ZeroTempWorkbook {
 
             if value.is_empty() {
                 self.xml_buffer.extend_from_slice(b"\"/>");
-            } else if let Ok(_num) = value.parse::<f64>() {
-                self.xml_buffer.extend_from_slice(b"\" t=\"n\"><v>");
-                self.xml_buffer.extend_from_slice(value.as_bytes());
-                self.xml_buffer.extend_from_slice(b"</v></c>");
             } else {
-                // Inline string
+                // Always treat as string to preserve leading zeros and exact formatting
+                // Users should use write_row_typed() if they want numeric types
                 self.xml_buffer
                     .extend_from_slice(b"\" t=\"inlineStr\"><is><t>");
                 Self::write_escaped(&mut self.xml_buffer, value);

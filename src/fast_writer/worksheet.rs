@@ -168,6 +168,7 @@ impl<W: Write> FastWorksheet<W> {
                     if style_index > 0 {
                         self.xml_writer.attribute_int("s", style_index as i64)?;
                     }
+                    self.xml_writer.attribute("t", "n")?; // Number type
                     self.xml_writer.close_start_tag()?;
 
                     self.xml_writer.start_element("v")?;
@@ -183,6 +184,7 @@ impl<W: Write> FastWorksheet<W> {
                     if style_index > 0 {
                         self.xml_writer.attribute_int("s", style_index as i64)?;
                     }
+                    self.xml_writer.attribute("t", "n")?; // Number type
                     self.xml_writer.close_start_tag()?;
 
                     self.xml_writer.start_element("v")?;

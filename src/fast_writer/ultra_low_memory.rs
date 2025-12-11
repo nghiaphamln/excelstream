@@ -40,22 +40,13 @@ impl UltraLowMemoryWorkbook {
     }
 
     pub fn write_row_typed(&mut self, values: &[CellValue]) -> Result<()> {
-        let string_values: Vec<String> = values
+        // Convert to StyledCell with default style to preserve types
+        let styled_cells: Vec<crate::types::StyledCell> = values
             .iter()
-            .map(|v| match v {
-                CellValue::String(s) => s.clone(),
-                CellValue::Int(i) => i.to_string(),
-                CellValue::Float(f) => f.to_string(),
-                CellValue::Bool(b) => if *b { "TRUE" } else { "FALSE" }.to_string(),
-                CellValue::DateTime(dt) => dt.to_string(), // Excel serial date number
-                CellValue::Error(e) => e.clone(),
-                CellValue::Formula(f) => f.clone(),
-                CellValue::Empty => String::new(),
-            })
+            .map(|v| crate::types::StyledCell::new(v.clone(), crate::types::CellStyle::Default))
             .collect();
 
-        let refs: Vec<&str> = string_values.iter().map(|s| s.as_str()).collect();
-        self.inner.write_row(&refs)
+        self.inner.write_row_styled(&styled_cells)
     }
 
     pub fn write_row_styled(&mut self, values: &[crate::types::StyledCell]) -> Result<()> {

@@ -6,7 +6,13 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/KSD-CO/excelstream/workflows/Rust/badge.svg)](https://github.com/KSD-CO/excelstream/actions)
 
-> **🔥 What's New in v0.10.0:**
+> **� What's New in v0.10.1:**
+> - 🔢 **Bug Fix: Number Format** - Numbers now display correctly in Excel (not as text)
+> - 🔢 **Bug Fix: Leading Zeros** - Phone numbers, ZIP codes preserve leading zeros (e.g., "0987919911")
+> - ✅ **Data Integrity**: No more data loss or incorrect formatting
+> - 📊 **Excel Functions**: SUM(), AVERAGE() now work correctly with typed numbers
+
+> **�🔥 What's New in v0.10.0:**
 > - ☁️ **S3 Direct Streaming** - Upload Excel files directly to S3 without local disk! (Zero temp files)
 > - ⚡ **Incremental Append Mode** - Append rows to existing files 10-100x faster (no full rewrite)
 > - 🚀 **Cloud-Native Architecture** - Perfect for serverless/Lambda/containers

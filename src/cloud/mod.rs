@@ -36,7 +36,13 @@
 pub mod s3_writer;
 
 #[cfg(feature = "cloud-s3")]
+pub mod s3_reader;
+
+#[cfg(feature = "cloud-s3")]
 pub use s3_writer::S3ExcelWriter;
+
+#[cfg(feature = "cloud-s3")]
+pub use s3_reader::S3ExcelReader;
 
 use crate::error::Result;
 use std::io::Write;
