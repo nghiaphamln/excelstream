@@ -19,7 +19,7 @@
 //! - Best for: Fast iteration, simple data extraction, no formatting needs
 
 use crate::error::{ExcelError, Result};
-use crate::fast_writer::streaming_zip_reader::StreamingZipReader;
+use crate::fast_writer::StreamingZipReader;
 use crate::types::{CellValue, Row};
 use std::io::{BufReader, Read};
 use std::path::Path;

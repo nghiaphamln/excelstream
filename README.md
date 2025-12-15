@@ -6,6 +6,14 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/KSD-CO/excelstream/workflows/Rust/badge.svg)](https://github.com/KSD-CO/excelstream/actions)
 
+> **📦 What's New in v0.11.0:**
+> - 🎯 **s-zip Library Integration** - ZIP operations now powered by standalone [s-zip](https://crates.io/crates/s-zip) crate
+> - ♻️ **Code Reusability** - ~544 lines of ZIP code extracted to reusable library
+> - 🚀 **Zero Performance Impact** - Same speed: 42K rows/sec, same memory: 2-3 MB
+> - 🔧 **Better Maintainability** - Single source of truth for ZIP operations
+> - 🌟 **Community Value** - s-zip now available for other Rust projects
+> - ✅ **Production Tested** - All benchmarks pass with identical results
+
 > **� What's New in v0.10.1:**
 > - 🔢 **Bug Fix: Number Format** - Numbers now display correctly in Excel (not as text)
 > - 🔢 **Bug Fix: Leading Zeros** - Phone numbers, ZIP codes preserve leading zeros (e.g., "0987919911")

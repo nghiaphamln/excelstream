@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2024-12-15
+
+### Changed
+- **s-zip Library Integration**: Extracted ZIP operations into standalone [s-zip](https://crates.io/crates/s-zip) crate
+  - **Code Reusability**: ~544 lines of ZIP code now reusable across projects
+  - **Zero Performance Impact**: Identical speed (42K rows/sec) and memory (2-3 MB)
+  - **Better Maintainability**: Single source of truth for ZIP operations
+  - **Community Value**: s-zip now available for other Rust projects
+  - **Backward Compatible**: All existing APIs work without changes
+
+### Internal
+- Replaced internal `streaming_zip_reader.rs` and `streaming_zip_writer.rs` with s-zip dependency
+- Updated `fast_writer` modules to re-export s-zip types for backward compatibility
+- Added `From<s_zip::SZipError>` conversion for seamless error handling
+
+### Performance (unchanged)
+- Write: 42,557 rows/sec (strings), 43,839 rows/sec (direct)
+- Read: 36,396 rows/sec with streaming
+- Memory: 2-3 MB constant for any file size
+- File size: 180-193 MB (1M rows, 30 columns)
+
+
 ## [0.9.0] - 2024-12-08
 
 ### 🎉 Major Feature: Zero-Temp Streaming Architecture

@@ -3,7 +3,7 @@
 //! Expected memory: 8-12 MB (vs 17MB with temp files)
 
 use super::shared_strings::SharedStrings;
-use super::streaming_zip_writer::StreamingZipWriter;
+use super::StreamingZipWriter;
 use crate::error::Result;
 use crate::types::ProtectionOptions;
 
@@ -24,7 +24,7 @@ pub struct ZeroTempWorkbook {
 
 impl ZeroTempWorkbook {
     pub fn new(path: &str, compression_level: u32) -> Result<Self> {
-        let zip_writer = StreamingZipWriter::new(path, compression_level)?;
+        let zip_writer = StreamingZipWriter::with_compression(path, compression_level)?;
 
         Ok(Self {
             zip_writer: Some(zip_writer),

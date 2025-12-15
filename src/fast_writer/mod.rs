@@ -3,17 +3,18 @@
 //! This module provides a high-performance Excel writer that focuses on:
 //! - Minimal memory allocations (2.7 MB for any file size with ZeroTempWorkbook)
 //! - Direct XML generation
-//! - Optimized ZIP compression
+//! - Optimized ZIP compression (using s-zip library)
 //! - Streaming-first design
 
 pub mod memory;
 pub mod shared_strings;
-pub mod streaming_zip_reader;
-pub mod streaming_zip_writer;
 pub mod ultra_low_memory;
 pub mod worksheet;
 pub mod xml_writer;
 pub mod zero_temp_workbook;
+
+// Re-export s-zip types for backward compatibility
+pub use s_zip::{StreamingZipReader, StreamingZipWriter, ZipEntry};
 
 use crate::error::Result;
 use std::path::Path;

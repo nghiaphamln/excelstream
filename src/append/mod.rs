@@ -36,7 +36,7 @@
 //! - **Append mode**: 0.5-2 seconds (10-100x faster!)
 
 use crate::error::{ExcelError, Result};
-use crate::fast_writer::streaming_zip_reader::StreamingZipReader;
+use crate::fast_writer::StreamingZipReader;
 use crate::types::CellValue;
 use std::path::{Path, PathBuf};
 
