@@ -5,6 +5,66 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2025-01-02
+
+### 🎉 Major Feature: TRUE S3 Streaming (ZERO Temp Files!)
+
+**Revolutionary S3 integration** using s-zip 0.5.1 cloud support - stream Excel files directly to S3 with NO temp files and constant memory!
+
+### Changed
+- **S3ExcelWriter - TRUE Streaming**: Complete rewrite using s-zip 0.5.1 cloud-s3
+  - **ZERO temp files**: Stream directly to S3 (no disk usage at all!)
+  - **Constant memory**: ~30-35 MB regardless of file size
+  - **Async API**: All methods now async/await (breaking change)
+  - **High throughput**: 94K rows/sec streaming to S3
+  - **Multipart upload**: Automatic S3 multipart handled by s-zip
+
+### Breaking Changes
+- **S3ExcelWriter API is now async**:
+  - `.write_row()` → `.write_row().await`
+  - `.write_header_bold()` → `.write_header_bold().await`
+  - `.save()` → `.save().await`
+  - All methods require `.await` now
+
+### Performance (Real AWS S3 Tests)
+
+| Dataset | Peak Memory | Throughput | Time | Temp Files |
+|---------|-------------|------------|------|------------|
+| 10K rows | 15.0 MB | 10,951 rows/s | 0.91s | ZERO ✅ |
+| 100K rows | 23.2 MB | 45,375 rows/s | 2.20s | ZERO ✅ |
+| 500K rows | 34.4 MB | 94,142 rows/s | 5.31s | ZERO ✅ |
+
+**Memory is Constant:**
+- 10K → 100K rows (10x data): Memory only +55% (15 → 23 MB)
+- 100K → 500K rows (5x data): Memory only +48% (23 → 34 MB)
+- TRUE streaming confirmed - no file-size-proportional growth!
+
+### Added
+- **New Examples**:
+  - `s3_performance_test.rs`: Benchmark S3 streaming with configurable dataset size
+  - `s3_verify.rs`: Download and verify S3 uploaded files
+- **Performance Documentation**:
+  - `PERFORMANCE_S3.md`: Detailed memory usage analysis and benchmarks
+
+### Internal
+- Updated s-zip dependency: 0.3.1 → 0.5.1
+- Added s-zip cloud-s3 feature to cloud-s3 feature flag
+- Removed tempfile from S3 writer implementation (still needed for S3 reader)
+- S3ExcelWriter now uses `s_zip::cloud::S3ZipWriter` + `AsyncStreamingZipWriter`
+
+### Migration Guide
+```rust
+// OLD (v0.13.0 - sync API, temp files)
+let mut writer = S3ExcelWriter::builder().build().await?;
+writer.write_row(&["a", "b"])?;  // sync
+writer.save().await?;
+
+// NEW (v0.14.0 - async API, no temp files)
+let mut writer = S3ExcelWriter::builder().build().await?;
+writer.write_row(["a", "b"]).await?;  // async!
+writer.save().await?;
+```
+
 ## [0.12.1] - 2024-12-17
 
 ### Changed

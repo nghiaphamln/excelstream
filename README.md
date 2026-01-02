@@ -1,2356 +1,335 @@
 # excelstream
 
-🦀 **ExcelStream is a high-performance XLSX & CSV writer/reader for Rust, optimized for massive datasets with constant memory usage.**
+🦀 **High-performance streaming Excel & CSV library for Rust with constant memory usage**
 
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/KSD-CO/excelstream/workflows/Rust/badge.svg)](https://github.com/KSD-CO/excelstream/actions)
 
-> **🔥 What's New in v0.13.0:**
-> - 📊 **CSV Support** - High-performance CSV read/write with streaming!
-> - ⚡ **13.5x Faster** - CSV writes at 1.2M rows/sec (vs 91K for Excel)
-> - 🗜️ **Zstd Compression** - Best-in-class compression (2.9x smaller than plain CSV)
-> - 📉 **Ultra-Low Memory** - < 5MB constant usage for any file size
-> - 🌐 **HTTP Streaming** - Stream CSV files directly via HTTP responses
-> - 🎯 **Auto-Detection** - Automatically detects .csv, .csv.zst, .csv.gz formats
-> - ✅ **RFC 4180-Like** - Proper CSV parsing with quote/comma handling
-> - 🐛 **Excel Reader Fix** - Fixed critical date parsing & cell type detection bugs
-> - 📅 **Date Parsing** - Excel dates now parse correctly (e.g., 44562 → 2022-01-01)
-> - 🔢 **Type Detection** - Proper Int, Float, Bool, Date, String, Error detection
-> - 🚀 **Production Ready** - All 48 tests pass, benchmarked and optimized
+## ✨ Highlights
 
-> **🔥 What's New in v0.12.0:**
-> - ☁️ **S3 Streaming Optimization** - 83% memory reduction for S3 uploads!
-> - 📉 **Memory Improvement** - Peak: 8.6 MB (was 52.7 MB) for 1M rows
-> - 🚀 **Streaming Upload** - Uploads in 5MB chunks instead of reading entire file
-> - 🎯 **Production Tested** - Verified on real S3 (ap-southeast-1)
-> - ✅ **Backward Compatible** - Zero API changes
-> - 🌐 **HTTP Streaming** - Stream Excel files directly via HTTP responses (Axum, Actix, Warp)
-> - 🚀 **Zero Disk I/O** - Generate Excel entirely in memory for web APIs
-> - 📦 **Framework Agnostic** - Works with any async web framework
-> - 🎯 **Memory Efficient** - Peak memory = file size + ~5-10MB overhead
-> - ✅ **Production Ready** - Full Excel support (formulas, multiple sheets, styling)
+- 📊 **XLSX & CSV Support** - Read/write Excel and CSV files
+- 📉 **Constant Memory** - ~3-35 MB regardless of file size
+- ☁️ **Cloud Streaming** - Direct S3 uploads with ZERO temp files
+- ⚡ **High Performance** - 94K rows/sec (S3), 1.2M rows/sec (CSV)
+- 🔄 **True Streaming** - Process files row-by-row, no buffering
+- 🐳 **Production Ready** - Works in 256 MB containers
 
-> **📦 What's New in v0.11.0:**
-> - 🎯 **s-zip Library Integration** - ZIP operations now powered by standalone [s-zip](https://crates.io/crates/s-zip) crate
-> - ♻️ **Code Reusability** - ~544 lines of ZIP code extracted to reusable library
-> - 🚀 **Zero Performance Impact** - Same speed: 42K rows/sec, same memory: 2-3 MB
-> - 🔧 **Better Maintainability** - Single source of truth for ZIP operations
-> - 🌟 **Community Value** - s-zip now available for other Rust projects
-> - ✅ **Production Tested** - All benchmarks pass with identical results
+## 🔥 What's New in v0.14.0
 
-> **� What's New in v0.10.1:**
-> - 🔢 **Bug Fix: Number Format** - Numbers now display correctly in Excel (not as text)
-> - 🔢 **Bug Fix: Leading Zeros** - Phone numbers, ZIP codes preserve leading zeros (e.g., "0987919911")
-> - ✅ **Data Integrity**: No more data loss or incorrect formatting
-> - 📊 **Excel Functions**: SUM(), AVERAGE() now work correctly with typed numbers
-
-> **�🔥 What's New in v0.10.0:**
-> - ☁️ **S3 Direct Streaming** - Upload Excel files directly to S3 without local disk! (Zero temp files)
-> - ⚡ **Incremental Append Mode** - Append rows to existing files 10-100x faster (no full rewrite)
-> - 🚀 **Cloud-Native Architecture** - Perfect for serverless/Lambda/containers
-> - 📦 **Big Data Ready** - Stream from Parquet, Arrow, databases directly to Excel
-> - 🐍 **Python Integration** - PyO3 bindings for pandas DataFrame export
-
-> **✨ What's New in v0.9.1:**
-> - 🎨 **Cell Styling Fixed** - Complete styles.xml with 14 predefined styles (bold, colors, number formats)
-> - 🔒 **Worksheet Protection Fixed** - Password protection with granular permissions now working
-> - ⚡ **Zero Performance Impact** - Styling adds 0% overhead, protection adds 0% overhead
-> - 🎯 **Production Validated** - 31K rows/sec with styling, 38K rows/sec plain text
-> - 📊 **Memory Constant** - Still 2.38 MB for any file size with all features enabled
-
-> **v0.9.0 Features:**
-> - 🧠 **84% Memory Reduction** - New streaming architecture: **2.7 MB** vs 17 MB (for 1M rows!)
-> - 📁 **Zero Temp Files** - Stream XML directly into ZIP compressor (no disk I/O)
-> - ⚡ **Same Speed** - ~1400ms for 1M rows (compression level 6)
-> - 🎯 **ZeroTempWorkbook** - New API for absolute minimal memory usage
-> - 📦 **Streaming ZIP Writer** - On-the-fly compression with data descriptors
-> - 💾 **Production Ready** - 2.7 MB RAM = run in 64 MB containers!
-
-> **v0.8.0 Features:**
-> - 🚀 **Removed Calamine** - Eliminated calamine dependency completely, now 100% custom implementation
-> - 🎯 **Constant Memory Streaming** - Read ANY file size with only 10-12 MB RAM (tested with 1GB+ files!)
-> - ⚡ **104x Memory Reduction** - 1.2GB XML → 11.6 MB RAM (vs 1204 MB with calamine)
-> - 📈 **Faster Performance** - Write: 106-118K rows/sec (+70%!), Read: 50-60K rows/sec
-> - 📊 **Multi-sheet Support** - Full workbook.xml parsing with sheet_names() and rows_by_index()
-> - 🌍 **Unicode Support** - Proper handling of non-ASCII sheet names and special characters
-> - 🔧 **Custom XML Parser** - Chunked reading (128 KB buffers) with smart tag boundary detection
-> - 🐳 **Production Ready** - Process multi-GB Excel files in tiny 256 MB Kubernetes pods
-
-## 🎯 Why ExcelStream?
-
-### The Problem with Traditional Excel Libraries
-
-Most Excel libraries in Rust (and other languages) load entire files into memory:
-
-```rust
-// ❌ Traditional approach - Loads ENTIRE file into RAM
-let workbook = Workbook::new("huge.xlsx")?;
-for row in workbook.worksheet("Sheet1")?.rows() {
-    // 1GB file = 1GB+ RAM usage!
-}
-```
-
-**Problems:**
-- 📈 Memory grows with file size (10MB file = 100MB+ RAM)
-- 💥 OOM crashes on large files (>100MB)
-- 🐌 Slow startup (must load everything first)
-- 🔴 Impossible in containers (<512MB RAM)
-
-**What About Calamine?**
-- Even calamine (popular Rust library) loads full files into memory
-- v0.7.x used calamine: 86 MB file → 86 MB RAM (better than most, but not streaming)
-### The ExcelStream Solution: Streaming Architecture
-
-```rust
-// ✅✅ ExcelStream ZeroTempWorkbook (v0.9.0+) - Stream XML directly into compressor!
-use excelstream::fast_writer::ZeroTempWorkbook;
-
-let mut writer = ZeroTempWorkbook::new("huge.xlsx", 6)?; // compression level 6
-writer.add_worksheet("Sheet1")?;
-for i in 0..10_000_000 {
-    writer.write_row(&[&i.to_string(), "data"])?; // Only 2.7 MB RAM!
-}
-writer.close()?;
-
-// ✅ ExcelStream Reader (v0.8.0+) - Custom chunked XML parser!
-let mut reader = ExcelReader::open("huge.xlsx")?;
-for row in reader.rows("Sheet1")? {
-    // 86 MB file (1.2 GB uncompressed XML) = only 11.6 MB RAM! 50K-60K rows/sec!
-    // No calamine dependency - pure streaming implementation!
-}
-```
-
-**v0.9.0 Architecture:**
-- **Zero temp files** - Stream XML directly into ZIP compressor
-- On-the-fly DEFLATE compression with data descriptors
-- 4KB XML buffer (reused per row)
-- Direct write to final .xlsx file
-- Result: **84% less memory** than v0.8 (2.7 MB vs 17 MB)!
-
-**Why This Matters:**
-
-| Scenario | Traditional Library | ExcelStream v0.8 | ExcelStream v0.9 |
-|----------|-------------------|-------------------|------------------|
-| Write 1M rows | 100+ MB RAM | 17 MB RAM | **2.7 MB RAM** ✅ |
-| Write 10M rows | ❌ Crash | 17 MB RAM | **2.7 MB RAM** ✅ |
-| Read 86 MB file (1.2 GB XML) | ❌ Crash | **11.6 MB RAM** ✅ | **11.6 MB RAM** ✅ |
-| Read 100 MB file | 1+ GB RAM | **~12 MB RAM** ✅ | **~12 MB RAM** ✅ |
-| K8s pod (<512MB) | ❌ OOMKilled | ✅ Works | ✅ Always works ✅ |
-
-**Note:** v0.9.0 streaming write architecture (zero temp files) + v0.8.0 custom XML parser (no calamine).
-
-## 🚀 Real-World Use Cases
-
-### 1. Processing Large Enterprise Files (>100 MB)
-
-**Problem:** Sales team sends 500 MB Excel with 2M+ customer records. Traditional libraries crash.
-
-```rust
-use excelstream::reader::ExcelReader;
-
-// ✅ Processes 2M rows with only 25 MB RAM
-let mut reader = ExcelReader::open("customers_2M_rows.xlsx")?;
-let mut total_revenue = 0.0;
-
-for row in reader.rows("Sales")? {
-    let row = row?;
-    if let Some(amount) = row.get(5).and_then(|c| c.as_f64()) {
-        total_revenue += amount;
-    }
-    // Memory stays constant! No accumulation!
-}
-
-println!("Total: ${:.2}", total_revenue);
-```
-
-**Why ExcelStream wins:**
-- ✅ Constant 25 MB memory (traditional = 5+ GB)
-- ✅ Processes row-by-row (no buffering)
-- ✅ Works in K8s pods with 512 MB limit
-- ⚡ Starts processing immediately (no load delay)
-
-### 2. Daily Database Exports (Production ETL)
-
-**Problem:** Export 430K+ invoice records to Excel every night. Must fit in 512 MB pod.
-
-```rust
-use excelstream::ExcelWriter;
-use postgres::{Client, NoTls};
-
-// ✅ Real production code - 430,099 rows in 94 seconds
-let mut writer = ExcelWriter::with_compression("invoices.xlsx", 3)?;
-writer.set_flush_interval(500);  // Flush every 500 rows
-
-let mut client = Client::connect("postgresql://...", NoTls)?;
-let mut tx = client.transaction()?;
-tx.execute("DECLARE cursor CURSOR FOR SELECT * FROM invoices", &[])?;
-
-loop {
-    let rows = tx.query("FETCH 500 FROM cursor", &[])?;
-    if rows.is_empty() { break; }
-    
-    for row in rows {
-        writer.write_row_typed(&[
-            CellValue::Int(row.get(0)),
-            CellValue::String(row.get(1)),
-            CellValue::Float(row.get(2)),
-        ])?;
-    }
-}
-
-writer.save()?; // 62 MB file, used only 25 MB RAM
-```
-
-**Production Results:**
-- ✅ 430K rows exported successfully
-- ✅ Peak memory: 25 MB (traditional = 500+ MB)
-- ✅ Duration: 94 seconds (4,567 rows/sec)
-- ✅ Runs nightly in K8s pod (512 MB limit)
-- 🐳 Zero OOMKilled errors
-
-### 3. Real-Time Streaming Exports (No Wait Time)
-
-**Problem:** User clicks "Export" button. Traditional libraries must load ALL data first = 30+ second wait.
-
-```rust
-use excelstream::ExcelWriter;
-use tokio_stream::StreamExt;
-
-// ✅ Stream directly from async query - starts writing immediately!
-let mut writer = ExcelWriter::new("report.xlsx")?;
-writer.write_header_bold(&["Date", "User", "Action"])?;
-
-let mut stream = db.query_stream("SELECT * FROM audit_log").await?;
-
-// User sees progress immediately! No 30-second wait!
-while let Some(row) = stream.next().await {
-    let row = row?;
-    writer.write_row(&[
-        row.get("date"),
-        row.get("user"),
-        row.get("action"),
-    ])?;
-    // Every 100 rows = visible progress!
-}
-
-writer.save()?;
-```
-
-**User Experience:**
-- ✅ Instant feedback (not 30-second blank screen)
-- ✅ Progress bar possible (count rows written)
-- ✅ Cancellable (user can abort early)
-- 🚀 Feels 10x faster (starts immediately)
-
-### 4. Kubernetes CronJobs (Memory-Limited)
-
-**Problem:** K8s pods have 256-512 MB limits. Traditional libraries need 2+ GB for large exports.
-
-```rust
-use excelstream::ExcelWriter;
-
-// ✅ Optimized for K8s - uses only 15 MB!
-let mut writer = ExcelWriter::with_compression("export.xlsx", 1)?;
-writer.set_flush_interval(100);      // Aggressive flushing
-writer.set_max_buffer_size(256_000); // 256 KB buffer
-
-// Export 1M rows in 256 MB pod - impossible with traditional libraries!
-for i in 0..1_000_000 {
-    writer.write_row(&[
-        &i.to_string(),
-        &format!("data_{}", i),
-    ])?;
-}
-
-writer.save()?;
-```
-
-**K8s Benefits:**
-- ✅ Works in 256 MB pods (traditional needs 2+ GB)
-- ✅ Predictable memory (no spikes or OOM)
-- ✅ Fast compression (level 1 = 2x faster)
-- 🐳 Perfect for cost-optimized clusters
-
-### 5. Processing Large Excel Imports (v0.8.0+)
-
-**Problem:** Users upload 100 MB+ Excel files. Traditional readers load entire file = OOM crash.
-
-```rust
-use excelstream::ExcelReader;
-
-// ✅ Process 1 GB Excel file with only 12 MB RAM!
-// v0.8.0: Custom XML parser, no calamine!
-let mut reader = ExcelReader::open("huge_upload.xlsx")?;
-
-let mut total = 0.0;
-let mut count = 0;
-
-for row_result in reader.rows("Sheet1")? {
-    let row = row_result?;
-    let cells = row.to_strings();
-    
-    // Process row-by-row, memory stays constant!
-    if let Some(amount) = cells.get(2) {
-        if let Ok(val) = amount.parse::<f64>() {
-            total += val;
-            count += 1;
-        }
-    }
-    
-    // Validate every 10K rows
-    if count % 10_000 == 0 {
-        println!("Processed {} rows, total: ${:.2}", count, total);
-    }
-}
-
-println!("Final: {} rows, total: ${:.2}", count, total);
-```
-
-**Import Benefits (v0.8.0):**
-- ✅ 1 GB file (1.2 GB uncompressed XML) = only 11.6 MB RAM
-- ✅ 50K-60K rows/sec processing speed
-- ✅ 104x less memory than loading full file (1204 MB → 11.6 MB)
-- ✅ Works in 256 MB Kubernetes pods
-- ✅ 100% accurate - captures all rows without data loss
-- ✅ No calamine dependency - custom chunked XML parser
-- ⚡ Starts processing immediately (no 30-second load wait)
-
-### 6. Multi-Tenant SaaS Exports
-
-**Problem:** 100 concurrent users export reports. Traditional = 100 × 500 MB = 50 GB RAM!
-
-```rust
-use excelstream::ExcelWriter;
-
-// ✅ Each export uses only 20 MB
-async fn export_for_user(user_id: i64) -> Result<()> {
-    let mut writer = ExcelWriter::new(&format!("user_{}.xlsx", user_id))?;
-    
-    let records = db.query("SELECT * FROM data WHERE user_id = ?", user_id).await?;
-    for rec in records {
-        writer.write_row_typed(&[
-            CellValue::Int(rec.id),
-            CellValue::String(rec.name),
-        ])?;
-    }
-    
-    writer.save()?;
-    Ok(())
-}
-
-// 100 concurrent exports = 100 × 20 MB = 2 GB (not 50 GB!)
-```
-
-**SaaS Benefits:**
-- ✅ 100 concurrent users = 2 GB (traditional = 50+ GB)
-- ✅ Scales horizontally (predictable memory)
-- ✅ No "export queue" needed
-- 💰 Lower infrastructure costs
-
-## 📦 Installation
-
-Add to your `Cargo.toml`:
-
-```toml
-[dependencies]
-excelstream = "0.13"
-
-# Optional: Enable cloud/HTTP streaming features
-excelstream = { version = "0.13", features = ["cloud-s3"] }
-excelstream = { version = "0.13", features = ["cloud-http"] }
-```
-
-**Latest version:** `0.13.0` - CSV support, Zstd compression, HTTP CSV streaming, ultra-low memory
-
-## 🚀 Quick Start
-
-### Reading Excel Files (Streaming)
-
-```rust
-use excelstream::reader::ExcelReader;
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut reader = ExcelReader::open("data.xlsx")?;
-    
-    // List all sheets
-    for sheet_name in reader.sheet_names() {
-        println!("Sheet: {}", sheet_name);
-    }
-    
-    // Read rows one by one (streaming iterator)
-    for row_result in reader.rows("Sheet1")? {
-        let row = row_result?;
-        println!("Row {}: {:?}", row.index, row.to_strings());
-    }
-    
-    Ok(())
-}
-```
-
-**v0.8.0 Note:** `ExcelReader` now uses a custom chunked XML parser (no calamine). Memory usage is constant (~10-12 MB) regardless of file size!
-
-### Reading Large Files (Streaming - v0.8.0)
-
-`ExcelReader` provides constant memory usage (~10-12 MB) for ANY file size:
-
-```rust
-use excelstream::ExcelReader;
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Open file - loads only Shared Strings Table (~5-10 MB)
-    let mut reader = ExcelReader::open("huge_file_1GB.xlsx")?;
-    
-    // Stream rows - constant memory regardless of file size!
-    // Custom XML parser: 128 KB chunks, no calamine!
-    for row_result in reader.rows("Sheet1")? {
-        let row = row_result?;
-        
-        // Process row data
-        println!("Row: {:?}", row.to_strings());
-    }
-    
-    Ok(())
-}
-```
-
-**Performance (v0.8.0):**
-- ✅ **Memory:** Constant 10-12 MB (file can be 1 GB+!)
-- ✅ **Speed:** 50K-60K rows/sec
-- ✅ **K8s Ready:** Works in 256 MB pods
-- ⚡ **No Dependencies:** Custom XML parser, no calamine
-- 🎯 **104x Reduction:** 1.2 GB XML → 11.6 MB RAM
-
-**Architecture:**
-- Custom chunked XML parser (128 KB chunks)
-- Smart buffering with split-tag handling
-- SST loaded once, rows streamed incrementally
-- No formula/formatting support (raw values only)
-
-### Writing Excel Files (Zero Temp Streaming - v0.9.0)
-
-**New in v0.9.0:** `ZeroTempWorkbook` - Stream XML directly into ZIP compressor! **84% less memory** than v0.8.
-
-```rust
-use excelstream::fast_writer::ZeroTempWorkbook;
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Create workbook with compression level 6 (balanced)
-    let mut writer = ZeroTempWorkbook::new("output.xlsx", 6)?;
-    
-    // Add a worksheet
-    writer.add_worksheet("Sales Data")?;
-    
-    // Write millions of rows with only 2.7 MB RAM!
-    for i in 1..=10_000_000 {
-        writer.write_row(&[
-            &i.to_string(),
-            &format!("Product{}", i),
-            &(i as f64 * 99.99).to_string(),
-        ])?;
-    }
-    
-    // Close and finalize (writes central directory)
-    writer.close()?;
-    
-    Ok(())
-}
-```
-
-**Performance (v0.9.0):**
-- ✅ **Memory:** Only **2.7 MB** for ANY SIZE (84% less than v0.8!)
-- ✅ **Speed:** 50K-60K rows/sec (same as v0.8)
-- ✅ **Zero Temp Files:** Streams directly to final .xlsx
-- ✅ **K8s Ready:** Works in 128 MB pods
-- 🎯 **Architecture:** On-the-fly DEFLATE with data descriptors
-
-**Legacy Writer (v0.2.0 - still available):**
-
-```rust
-use excelstream::writer::ExcelWriter;
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = ExcelWriter::new("output.xlsx")?;
-    
-    // Configure streaming behavior (optional)
-    writer.set_flush_interval(500);  // Flush every 500 rows
-    writer.set_max_buffer_size(512 * 1024);  // 512KB buffer
-    
-    // Write header (note: no bold formatting in v0.2.0)
-    writer.write_header(&["ID", "Name", "Email"])?;
-    
-    // Write millions of rows with constant memory usage!
-    for i in 1..=1_000_000 {
-        writer.write_row(&[
-            &i.to_string(),
-            &format!("User{}", i),
-            &format!("user{}@example.com", i)
-        ])?;
-    }
-    
-    // Save file (closes ZIP and finalizes)
-    writer.save()?;
-    
-    Ok(())
-}
-```
-
-**Key Benefits:**
-- ✅ Constant ~80MB memory usage regardless of dataset size
-- ✅ High throughput: 60K-70K rows/sec (UltraLowMemoryWorkbook fastest at 69.5K)
-- ✅ Direct ZIP streaming - data written to disk immediately
-- ✅ Full formatting support: bold, styles, column widths, row heights
-
-### Writing with Typed Values (Recommended)
-
-For better Excel compatibility and performance, use typed values:
-
-```rust
-use excelstream::writer::ExcelWriter;
-use excelstream::types::CellValue;
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = ExcelWriter::new("typed_output.xlsx")?;
-
-    writer.write_header(&["Name", "Age", "Salary", "Active"])?;
-
-    // Typed values: numbers are numbers, formulas work in Excel
-    writer.write_row_typed(&[
-        CellValue::String("Alice".to_string()),
-        CellValue::Int(30),
-        CellValue::Float(75000.50),
-        CellValue::Bool(true),
-    ])?;
-
-    writer.save()?;
-    Ok(())
-}
-```
-
-**Benefits of `write_row_typed()`:**
-- ✅ Numbers are stored as numbers (not text)
-- ✅ Booleans display as TRUE/FALSE
-- ✅ Excel formulas work correctly
-- ✅ Better type safety
-- ✅ Excellent performance: 62.7K rows/sec (+2% faster than string-based)
-
-### Preserving Leading Zeros (Phone Numbers, IDs)
-
-**New in v0.6.1:** Proper handling of string numbers with leading zeros!
-
-#### Problem: Leading Zeros Lost
-
-```rust
-// ❌ WRONG: Auto number detection loses leading zeros
-writer.write_row(&["090899"]);  // Displays as 90899 in Excel
-```
-
-#### Solution 1: Use `write_row()` (All Strings)
-
-```rust
-// ✅ CORRECT: write_row() treats ALL values as strings
-writer.write_row(&["090899", "00123", "ID-00456"]);  
-// Displays: "090899", "00123", "ID-00456" ✅ Leading zeros preserved!
-```
-
-**As of v0.6.1**, `write_row()` no longer auto-detects numbers. All values are treated as strings.
-
-#### Solution 2: Use `write_row_typed()` with Explicit Types
-
-```rust
-use excelstream::types::CellValue;
-
-// ✅ String type: preserves leading zeros
-writer.write_row_typed(&[
-    CellValue::String("090899".to_string()),  // Phone: "090899" ✅
-    CellValue::String("00123".to_string()),   // ID: "00123" ✅
-])?;
-
-// ✅ Int type: actual number (no leading zero)
-writer.write_row_typed(&[
-    CellValue::Int(90899),  // Number: 90899 (no leading zero)
-    CellValue::Int(123),    // Number: 123
-])?;
-```
-
-#### Solution 3: Use `write_row_styled()` for Full Control
-
-```rust
-use excelstream::types::{CellValue, CellStyle};
-
-writer.write_row_styled(&[
-    (CellValue::String("090899".to_string()), CellStyle::Default),  // Preserves "090899"
-    (CellValue::Int(1234), CellStyle::NumberInteger),               // Formats as "1,234"
-])?;
-```
-
-**Type Handling Summary:**
-
-| Method | String "090899" | Int 90899 | Use When |
-|--------|----------------|-----------|----------|
-| `write_row(&[&str])` | "090899" ✅ | N/A | All data is text (IDs, codes) |
-| `write_row_typed(CellValue)` | "090899" ✅ | 90899 (number) | Mixed types, explicit control |
-| `write_row_styled()` | "090899" ✅ | 90899 (number) | Need formatting + type control |
-
-**Best Practice:** 
-- Phone numbers, IDs, ZIP codes → Use `CellValue::String` or `write_row()`
-- Amounts, quantities, calculations → Use `CellValue::Int` or `CellValue::Float`
-
-### Writing Excel Formulas
-
-```rust
-use excelstream::writer::ExcelWriter;
-use excelstream::types::CellValue;
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = ExcelWriter::new("formulas.xlsx")?;
-
-    // Header row
-    writer.write_header(&["Value 1", "Value 2", "Sum", "Average"])?;
-
-    // Data with formulas
-    writer.write_row_typed(&[
-        CellValue::Int(10),
-        CellValue::Int(20),
-        CellValue::Formula("=A2+B2".to_string()),      // Sum
-        CellValue::Formula("=AVERAGE(A2:B2)".to_string()), // Average
-    ])?;
-
-    writer.write_row_typed(&[
-        CellValue::Int(15),
-        CellValue::Int(25),
-        CellValue::Formula("=A3+B3".to_string()),
-        CellValue::Formula("=AVERAGE(A3:B3)".to_string()),
-    ])?;
-
-    // Total row with SUM formula
-    writer.write_row_typed(&[
-        CellValue::String("Total".to_string()),
-        CellValue::Empty,
-        CellValue::Formula("=SUM(C2:C3)".to_string()),
-        CellValue::Formula("=AVERAGE(D2:D3)".to_string()),
-    ])?;
-
-    writer.save()?;
-    Ok(())
-}
-```
-
-**Supported Formulas:**
-- ✅ Basic arithmetic: `=A1+B1`, `=A1*B1`, `=A1/B1`
-- ✅ SUM, AVERAGE, COUNT, MIN, MAX
-- ✅ Cell ranges: `=SUM(A1:A10)`
-- ✅ Complex formulas: `=IF(A1>100, "High", "Low")`
-- ✅ All standard Excel functions
-
-### Cell Formatting and Styling (v0.9.1 - Fixed!)
-
-**Updated in v0.9.1:** Complete styles.xml with 14 predefined styles now fully working!
-
-#### Bold Headers
-
-```rust
-use excelstream::writer::ExcelWriter;
-
-let mut writer = ExcelWriter::new("report.xlsx")?;
-
-// Write bold header
-writer.write_header_bold(&["Name", "Amount", "Status"])?;
-
-// Regular data rows
-writer.write_row(&["Alice", "1,234.56", "Active"])?;
-writer.write_row(&["Bob", "2,345.67", "Pending"])?;
-
-writer.save()?;
-```
-
-**v0.9.1 Fix:** Added complete styles.xml (3 fonts, 5 fills, 2 borders, 14 cellXfs)!
-
-#### Styled Cells
-
-Apply different styles to individual cells:
-
-```rust
-use excelstream::types::{CellValue, CellStyle};
-use excelstream::writer::ExcelWriter;
-
-let mut writer = ExcelWriter::new("report.xlsx")?;
-
-writer.write_header_bold(&["Item", "Amount", "Change %"])?;
-
-// Mix different styles in one row
-writer.write_row_styled(&[
-    (CellValue::String("Revenue".to_string()), CellStyle::TextBold),
-    (CellValue::Float(150000.00), CellStyle::NumberCurrency),
-    (CellValue::Float(0.15), CellStyle::NumberPercentage),
-])?;
-
-writer.write_row_styled(&[
-    (CellValue::String("Profit".to_string()), CellStyle::HighlightGreen),
-    (CellValue::Float(55000.00), CellStyle::NumberCurrency),
-    (CellValue::Float(0.22), CellStyle::NumberPercentage),
-])?;
-
-writer.save()?;
-```
-
-#### Uniform Row Styling
-
-Apply the same style to all cells in a row:
-
-```rust
-// All cells bold
-writer.write_row_with_style(&[
-    CellValue::String("IMPORTANT".to_string()),
-    CellValue::String("READ THIS".to_string()),
-    CellValue::String("URGENT".to_string()),
-], CellStyle::TextBold)?;
-
-// All cells highlighted yellow
-writer.write_row_with_style(&[
-    CellValue::String("Warning".to_string()),
-    CellValue::String("Check values".to_string()),
-    CellValue::String("Need review".to_string()),
-], CellStyle::HighlightYellow)?;
-```
-
-#### Available Cell Styles
-
-| Style | Format Code | Example | Use Case |
-|-------|------------|---------|----------|
-| `CellStyle::Default` | None | Plain text | Regular data |
-| `CellStyle::HeaderBold` | Bold | **Header** | Column headers |
-| `CellStyle::NumberInteger` | #,##0 | 1,234 | Whole numbers |
-| `CellStyle::NumberDecimal` | #,##0.00 | 1,234.56 | Decimals |
-| `CellStyle::NumberCurrency` | $#,##0.00 | $1,234.56 | Money amounts |
-| `CellStyle::NumberPercentage` | 0.00% | 95.00% | Percentages |
-| `CellStyle::DateDefault` | MM/DD/YYYY | 01/15/2024 | Dates |
-| `CellStyle::DateTimestamp` | MM/DD/YYYY HH:MM:SS | 01/15/2024 14:30:00 | Timestamps |
-| `CellStyle::TextBold` | Bold | **Bold text** | Emphasis |
-| `CellStyle::TextItalic` | Italic | *Italic text* | Notes |
-| `CellStyle::HighlightYellow` | Yellow bg | 🟨 Text | Warnings |
-| `CellStyle::HighlightGreen` | Green bg | 🟩 Text | Success |
-| `CellStyle::HighlightRed` | Red bg | 🟥 Text | Errors |
-| `CellStyle::BorderThin` | Thin borders | ▭ Text | Boundaries |
-
-#### Complete Example
-
-```rust
-use excelstream::writer::ExcelWriter;
-use excelstream::types::{CellValue, CellStyle};
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = ExcelWriter::new("quarterly_report.xlsx")?;
-
-    // Bold header
-    writer.write_header_bold(&["Quarter", "Revenue", "Expenses", "Profit", "Margin %"])?;
-
-    // Q1 - Green highlight for good performance
-    writer.write_row_styled(&[
-        (CellValue::String("Q1 2024".to_string()), CellStyle::Default),
-        (CellValue::Float(500000.00), CellStyle::NumberCurrency),
-        (CellValue::Float(320000.00), CellStyle::NumberCurrency),
-        (CellValue::Float(180000.00), CellStyle::NumberCurrency),
-        (CellValue::Float(0.36), CellStyle::NumberPercentage),
-    ])?;
-
-    // Q2 - Yellow highlight for warning
-    writer.write_row_styled(&[
-        (CellValue::String("Q2 2024".to_string()), CellStyle::Default),
-        (CellValue::Float(450000.00), CellStyle::NumberCurrency),
-        (CellValue::Float(380000.00), CellStyle::NumberCurrency),
-        (CellValue::Float(70000.00), CellStyle::HighlightYellow),
-        (CellValue::Float(0.16), CellStyle::NumberPercentage),
-    ])?;
-
-    // Total row with formulas and bold
-    writer.write_row_styled(&[
-        (CellValue::String("Total".to_string()), CellStyle::TextBold),
-        (CellValue::Formula("=SUM(B2:B3)".to_string()), CellStyle::NumberCurrency),
-        (CellValue::Formula("=SUM(C2:C3)".to_string()), CellStyle::NumberCurrency),
-        (CellValue::Formula("=SUM(D2:D3)".to_string()), CellStyle::NumberCurrency),
-        (CellValue::Formula("=AVERAGE(E2:E3)".to_string()), CellStyle::NumberPercentage),
-    ])?;
-
-    writer.save()?;
-    Ok(())
-}
-```
-
-**See also:** Run `cargo run --example cell_formatting` to see all 14 styles in action!
-
-### Column Width, Row Height, and Cell Merging
-
-**New in v0.7.0:** Full layout control with column widths, row heights, and cell merging!
-
-#### Column Width
-
-Set column widths **before** writing any rows:
-
-```rust
-use excelstream::writer::ExcelWriter;
-
-let mut writer = ExcelWriter::new("report.xlsx")?;
-
-// Set column widths BEFORE writing rows
-writer.set_column_width(0, 25.0)?;  // Column A = 25 units wide
-writer.set_column_width(1, 12.0)?;  // Column B = 12 units wide
-writer.set_column_width(2, 15.0)?;  // Column C = 15 units wide
-
-// Now write rows
-writer.write_header_bold(&["Product Name", "Quantity", "Price"])?;
-writer.write_row(&["Laptop", "5", "$1,200.00"])?;
-
-writer.save()?;
-```
-
-**Important:**
-- ⚠️ Column widths must be set **before** writing any rows
-- Default column width is 8.43 units
-- One unit ≈ width of one character in default font
-- Typical range: 8-50 units
-
-#### Row Height
-
-Set row height for the next row to be written:
-
-```rust
-use excelstream::writer::ExcelWriter;
-
-let mut writer = ExcelWriter::new("report.xlsx")?;
-
-// Set height for header row (taller)
-writer.set_next_row_height(25.0)?;
-writer.write_header_bold(&["Name", "Age", "Email"])?;
-
-// Regular row (default height)
-writer.write_row(&["Alice", "30", "alice@example.com"])?;
-
-// Set height for next row
-writer.set_next_row_height(40.0)?;
-writer.write_row(&["Bob", "25", "bob@example.com"])?;
-
-writer.save()?;
-```
-
-**Important:**
-- Height is in points (1 point = 1/72 inch)
-- Default row height is 15 points
-- Typical range: 10-50 points
-- Setting is consumed by next `write_row()` call
-
-#### Complete Example with Sizing
-
-```rust
-use excelstream::writer::ExcelWriter;
-use excelstream::types::{CellValue, CellStyle};
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = ExcelWriter::new("sales_report.xlsx")?;
-
-    // Set column widths
-    writer.set_column_width(0, 25.0)?; // Product name - wider
-    writer.set_column_width(1, 12.0)?; // Quantity
-    writer.set_column_width(2, 15.0)?; // Price
-    writer.set_column_width(3, 15.0)?; // Total
-
-    // Tall header row
-    writer.set_next_row_height(25.0)?;
-    writer.write_header_bold(&["Product", "Quantity", "Price", "Total"])?;
-
-    // Data rows
-    writer.write_row_styled(&[
-        (CellValue::String("Laptop".to_string()), CellStyle::Default),
-        (CellValue::Int(5), CellStyle::NumberInteger),
-        (CellValue::Float(1200.00), CellStyle::NumberCurrency),
-        (CellValue::Formula("=B2*C2".to_string()), CellStyle::NumberCurrency),
-    ])?;
-
-    // Total row with custom height
-    writer.set_next_row_height(22.0)?;
-    writer.write_row_styled(&[
-        (CellValue::String("TOTAL".to_string()), CellStyle::TextBold),
-        (CellValue::Formula("=SUM(B2:B4)".to_string()), CellStyle::NumberInteger),
-        (CellValue::String("".to_string()), CellStyle::Default),
-        (CellValue::Formula("=SUM(D2:D4)".to_string()), CellStyle::NumberCurrency),
-    ])?;
-
-    writer.save()?;
-    Ok(())
-}
-```
-
-#### Cell Merging
-
-Merge cells horizontally (for titles) or vertically (for grouped data):
-
-```rust
-use excelstream::ExcelWriter;
-use excelstream::types::{CellValue, CellStyle};
-
-let mut writer = ExcelWriter::new("report.xlsx")?;
-
-// Set column widths
-writer.set_column_width(1, 30.0)?;
-writer.set_column_width(2, 15.0)?;
-
-// Title row spanning 3 columns
-writer.write_row_styled(&[
-    (CellValue::String("Q4 Sales Report".to_string()), CellStyle::HeaderBold),
-])?;
-writer.merge_cells("A1:C1")?; // Horizontal merge
-
-writer.write_row(&[""])?; // Empty row
-
-// Headers
-writer.write_header_bold(&["Region", "City", "Sales"])?;
-
-// Data with vertical merge for region
-writer.write_row(&["North", "Boston", "125,000"])?;
-writer.write_row(&["", "New York", "245,000"])?;
-writer.write_row(&["", "Chicago", "198,000"])?;
-writer.merge_cells("A4:A6")?; // Vertical merge - "North" spans 3 rows
-
-writer.save()?;
-```
-
-**Common Patterns:**
-- **Title rows**: `merge_cells("A1:F1")` - Header spanning all columns
-- **Grouped data**: `merge_cells("A2:A5")` - Category name for multiple items
-- **Subtotals**: `merge_cells("A10:C10")` - "Total" label spanning columns
-
-**See also:** 
-- `cargo run --example column_width_row_height` - Layout control demo
-- `cargo run --example column_merge_demo` - Complete merging examples
-
-### Direct FastWorkbook Usage (Maximum Performance)
-
-For maximum performance, use `FastWorkbook` directly:
-
-```rust
-use excelstream::fast_writer::FastWorkbook;
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut workbook = FastWorkbook::new("large_output.xlsx")?;
-    workbook.add_worksheet("Sheet1")?;
-    
-    // Write header
-    workbook.write_row(&["ID", "Name", "Email", "Age"])?;
-    
-    // Write 1 million rows efficiently (40K rows/sec)
-    for i in 1..=1_000_000 {
-        workbook.write_row(&[
-            &i.to_string(),
-            &format!("User{}", i),
-            &format!("user{}@example.com", i),
-            &(20 + (i % 50)).to_string(),
-        ])?;
-    }
-    
-    workbook.close()?;
-    Ok(())
-}
-```
-
-### 🧠 Hybrid SST Optimization (v0.5.0)
-
-**New in v0.5.0:** Intelligent selective deduplication for optimal memory usage!
-
-#### How It Works
-
-The Hybrid Shared String Table (SST) strategy intelligently decides which strings to deduplicate:
-
-```rust
-// Automatic optimization - no code changes needed!
-let mut workbook = FastWorkbook::new("output.xlsx")?;
-workbook.add_worksheet("Data")?;
-
-// Numbers → Inline as number type (no SST)
-workbook.write_row(&["123", "456.78", "999"])?;
-
-// Long strings (>50 chars) → Inline (usually unique)
-workbook.write_row(&["This is a very long description that exceeds 50 characters..."])?;
-
-// Short repeated strings → SST (efficient deduplication)
-workbook.write_row(&["Active", "Pending", "Active", "Completed"])?;
-```
-
-#### Memory Improvements
-
-| Workbook Type | Before v0.5.0 | After v0.5.0 | Reduction |
-|---------------|---------------|--------------|-----------|
-| Simple (5 cols, 1M rows) | 49 MB | **18.8 MB** | **62%** |
-| Medium (19 cols, 1M rows) | 125 MB | **15.4 MB** | **88%** |
-| Complex (50 cols, 100K rows) | ~200 MB | **22.7 MB** | **89%** |
-| Multi-workbook (4 × 100K rows) | 251 MB | **25.3 MB** | **90%** |
-
-#### Strategy Details
-
-The hybrid approach uses these rules:
-
-1. **Numbers** (`123`, `456.78`) → Inline as `<c t="n">` (no SST)
-2. **Long strings** (>50 chars) → Inline as `<c t="inlineStr">` (usually unique)
-3. **SST Full** (>100k unique) → New strings inline (graceful degradation)
-4. **Short strings** (≤50 chars) → SST for deduplication (efficient)
-
-#### Performance Impact (v0.9.1 Updated)
-
-**Write Performance (1M rows × 30 columns):**
-```
-ExcelWriter.write_row():       38,718 rows/sec (baseline) ⚡ FASTEST
-ExcelWriter.write_row_typed(): 35,547 rows/sec (-8%)
-ExcelWriter.write_row_styled(): 31,571 rows/sec (-18%)
-UltraLowMemoryWorkbook:        36,499 rows/sec (-6%)
-```
-
-**Write Performance (100K rows × 4 columns):**
-```
-ExcelWriter.write_row():       334,431 rows/sec
-ExcelWriter.write_row_typed(): 344,814 rows/sec (+3%)
-ExcelWriter.write_row_styled(): 332,174 rows/sec (-1%)
-UltraLowMemoryWorkbook:        340,164 rows/sec (+2%)
-```
-
-**Key Insights (v0.9.1):**
-- ✅ **Small files (100K)**: All methods ~equal (330K-345K rows/sec)
-- ✅ **Large files (1M)**: Plain text fastest (38K rows/sec)
-- ✅ **Styling overhead**: -18% on large files (extra XML attributes)
-- ✅ **Memory constant**: 2.38 MB regardless of method or size
-- ✅ **Still fast**: 31K rows/sec with styling = excellent!
-- ✅ **Protection overhead**: 0% (actually faster in some tests!)
-
-**Memory Efficiency:**
-- ALL methods: **2.38 MB constant** ✅
-- 186 MB file / 2.38 MB RAM = **78x efficiency**
-- No memory leaks across all writer types
-
-**See also:** `cargo run --example performance_with_features` for full benchmark
-
-### 🔒 Worksheet Protection (v0.9.1 - Fixed!)
-
-**Updated in v0.9.1:** Password protection now fully working with proper Excel XML!
-
-#### Basic Protection
-
-```rust
-use excelstream::{ExcelWriter, ProtectionOptions};
-
-let mut writer = ExcelWriter::new("protected.xlsx")?;
-
-// Protect with password - users can view but not edit
-let protection = ProtectionOptions::new()
-    .with_password("secret123");
-
-writer.protect_sheet(protection)?;
-writer.write_header_bold(&["Protected", "Data"])?;
-writer.write_row(&["Cannot", "Edit"])?;
-
-writer.save()?;
-```
-
-**v0.9.1 Fix:** Added `sheet="1"` attribute and proper protection flag handling!
-
-#### Granular Permissions
-
-Control exactly what users can do:
-
-```rust
-use excelstream::{ExcelWriter, ProtectionOptions};
-
-let mut writer = ExcelWriter::new("template.xlsx")?;
-
-// Allow formatting but prevent data changes
-let protection = ProtectionOptions::new()
-    .with_password("format123")
-    .allow_select_locked_cells(true)
-    .allow_select_unlocked_cells(true)
-    .allow_format_cells(true)      // ✅ Can format
-    .allow_format_columns(true)     // ✅ Can resize columns
-    .allow_format_rows(true);       // ✅ Can resize rows
-    // Everything else is protected (insert, delete, edit)
-
-writer.protect_sheet(protection)?;
-writer.save()?;
-```
-
-#### Data Entry Forms
-
-Allow users to insert/delete rows but protect headers:
-
-```rust
-let protection = ProtectionOptions::new()
-    .with_password("data456")
-    .allow_insert_rows(true)        // ✅ Can add rows
-    .allow_delete_rows(true)        // ✅ Can delete rows
-    .allow_sort(true);              // ✅ Can sort data
-
-writer.protect_sheet(protection)?;
-
-// Headers are protected, but users can add data rows
-writer.write_header_bold(&["Name", "Email", "Phone"])?;
-writer.write_row(&["Alice", "alice@example.com", "555-0001"])?;
-
-writer.save()?;
-```
-
-#### Available Permissions
-
-| Permission | Description | Use Case |
-|-----------|-------------|----------|
-| `allow_select_locked_cells` | Can select protected cells | View-only (default: true) |
-| `allow_select_unlocked_cells` | Can select editable cells | Data entry (default: true) |
-| `allow_format_cells` | Can change cell formats | Template customization |
-| `allow_format_columns` | Can resize columns | Layout adjustments |
-| `allow_format_rows` | Can resize rows | Layout adjustments |
-| `allow_insert_rows` | Can insert new rows | Data entry forms |
-| `allow_delete_rows` | Can delete rows | Data cleanup |
-| `allow_insert_columns` | Can insert new columns | Schema changes |
-| `allow_delete_columns` | Can delete columns | Schema changes |
-| `allow_sort` | Can sort data | Data analysis |
-| `allow_auto_filter` | Can use filters | Data analysis |
-
-**Common Use Cases:**
-- **Templates**: Protect formulas, allow data entry
-- **Reports**: Lock everything (read-only)
-- **Data Collection**: Allow insert/delete rows, protect headers
-- **Shared Sheets**: Allow formatting, prevent structure changes
-
-**See also:** `cargo run --example worksheet_protection` - Complete protection demo
-
-## 🗜️ Compression Level Configuration (v0.5.1)
-
-**New in v0.5.1:** Control ZIP compression levels to balance speed vs file size!
-
-### Understanding Compression Levels
-
-Excel files (.xlsx) are ZIP archives. ExcelStream lets you control the compression level:
-
-| Level | Speed | File Size | Use Case | Recommended For |
-|-------|-------|-----------|----------|-----------------|
-| **0** | Fastest | Largest (no compression) | Debugging only | Testing |
-| **1** | Very Fast ⚡ | ~2x larger | Fast exports | Development, testing |
-| **3** | Fast | Balanced | Good compromise | CI/CD pipelines |
-| **6** | Moderate | Smallest 📦 | Best compression | Production exports |
-| **9** | Slowest | Smallest | Maximum compression | Archives, long-term storage |
-
-**Default:** Level 6 (balanced performance and file size)
-
-### Setting Compression Level
-
-#### Method 1: At Workbook Creation
-
-```rust
-use excelstream::writer::ExcelWriter;
-
-// Create writer with fast compression (level 1)
-let mut writer = ExcelWriter::with_compression("output.xlsx", 1)?;
-
-writer.write_header(&["ID", "Name", "Amount"])?;
-writer.write_row(&["1", "Alice", "1000"])?;
-writer.save()?;
-```
-
-#### Method 2: After Creation
-
-```rust
-use excelstream::writer::ExcelWriter;
-
-let mut writer = ExcelWriter::new("output.xlsx")?;
-
-// Change compression level
-writer.set_compression_level(3); // Fast balanced compression
-
-writer.write_header(&["ID", "Name"])?;
-writer.write_row(&["1", "Alice"])?;
-writer.save()?;
-```
-
-#### Method 3: With UltraLowMemoryWorkbook
-
-```rust
-use excelstream::fast_writer::UltraLowMemoryWorkbook;
-
-let mut workbook = UltraLowMemoryWorkbook::with_compression("output.xlsx", 1)?;
-workbook.add_worksheet("Data")?;
-
-workbook.write_row(&["Header1", "Header2"])?;
-workbook.write_row(&["Value1", "Value2"])?;
-
-workbook.close()?;
-```
-
-#### Method 4: Environment-Based Configuration
-
-```rust
-use excelstream::writer::ExcelWriter;
-
-// Use fast compression for debug builds, production compression for release
-let compression_level = if cfg!(debug_assertions) { 1 } else { 6 };
-let mut writer = ExcelWriter::with_compression("output.xlsx", compression_level)?;
-
-writer.write_header(&["Data"])?;
-writer.write_row(&["Value"])?;
-writer.save()?;
-```
-
-### Real-World Performance (1M rows)
-
-Tested with 1 million rows × 4 columns on production hardware:
-
-| Configuration | Flush Interval | Buffer Size | Compression | Time | File Size | Memory |
-|--------------|----------------|-------------|-------------|------|-----------|--------|
-| **Aggressive** | 100 | 256 KB | Level 1 | **3.93s** ⚡ | 172 MB | <30 MB |
-| **Balanced** | 500 | 512 KB | Level 3 | **5.03s** | 110 MB | <30 MB |
-| **Default** | 1000 | 1 MB | Level 6 | **7.37s** | **88 MB** 📦 | <30 MB |
-| **Conservative** | 5000 | 2 MB | Level 6 | 8.00s | 88 MB | <30 MB |
-
-**Key Findings:**
-- Level 1 is **~2x faster** but files are **~2x larger** than level 6
-- Level 3 provides a **good balance** between speed and size
-- Memory usage is **constant <30 MB** regardless of compression level
-- Production exports typically use level 6 for optimal file size
-
-### Complete Example: Configurable Compression
-
-```rust
-use excelstream::writer::ExcelWriter;
-
-fn export_data(compression: u32) -> Result<(), Box<dyn std::error::Error>> {
-    let filename = format!("export_level_{}.xlsx", compression);
-    let mut writer = ExcelWriter::with_compression(&filename, compression)?;
-    
-    // Optional: Combine with memory optimization
-    if compression <= 1 {
-        // Fast compression - flush more aggressively
-        writer.set_flush_interval(100);
-        writer.set_max_buffer_size(256 * 1024);
-    } else if compression <= 3 {
-        // Balanced compression
-        writer.set_flush_interval(500);
-        writer.set_max_buffer_size(512 * 1024);
-    } else {
-        // Production compression - use larger buffers
-        writer.set_flush_interval(1000);
-        writer.set_max_buffer_size(1024 * 1024);
-    }
-    
-    writer.write_header(&["ID", "Name", "Email", "Status"])?;
-    
-    for i in 1..=1_000_000 {
-        writer.write_row(&[
-            &i.to_string(),
-            &format!("User{}", i),
-            &format!("user{}@example.com", i),
-            if i % 3 == 0 { "Active" } else { "Pending" },
-        ])?;
-    }
-    
-    writer.save()?;
-    println!("Exported with compression level {}: {}", compression, filename);
-    Ok(())
-}
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Test different compression levels
-    export_data(1)?; // Fast: ~4s, 172 MB
-    export_data(3)?; // Balanced: ~5s, 110 MB
-    export_data(6)?; // Production: ~7s, 88 MB
-    
-    Ok(())
-}
-```
-
-### Recommendations
-
-**For Development & Testing:**
-```rust
-let mut writer = ExcelWriter::with_compression("test.xlsx", 1)?;
-writer.set_flush_interval(100);
-```
-- ✅ Fast exports (2x speed improvement)
-- ✅ Quick iteration cycles
-- ⚠️ Larger files (not for production)
-
-**For CI/CD Pipelines:**
-```rust
-let mut writer = ExcelWriter::with_compression("report.xlsx", 3)?;
-writer.set_flush_interval(500);
-```
-- ✅ Good balance of speed and size
-- ✅ Reasonable export times
-- ✅ Acceptable file sizes
-
-**For Production Exports:**
-```rust
-let mut writer = ExcelWriter::with_compression("export.xlsx", 6)?; // Default
-writer.set_flush_interval(1000);
-```
-- ✅ Smallest file size
-- ✅ Best for network transfers
-- ✅ Optimal for storage
-
-**For Archives:**
-```rust
-let mut writer = ExcelWriter::with_compression("archive.xlsx", 9)?;
-```
-- ✅ Maximum compression
-- ⚠️ Slower export times
-- 📦 Best for long-term storage
-
-**See also:** Run `cargo run --example compression_level_config` for a complete demonstration!
-
-### Memory-Constrained Writing (For Kubernetes Pods)
-
-With v0.5.0+ and compression configuration (v0.5.1), memory usage is ultra-low:
-
-```rust
-use excelstream::writer::ExcelWriter;
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = ExcelWriter::with_compression("output.xlsx", 1)?; // Fast compression
-    
-    // For pods with < 512MB RAM (optimized configuration)
-    writer.set_flush_interval(500);       // Flush every 500 rows
-    writer.set_max_buffer_size(512 * 1024); // 512KB buffer
-    
-    writer.write_header(&["ID", "Name", "Email"])?;
-    
-    // Write large dataset without OOMKilled
-    for i in 1..=1_000_000 {
-        writer.write_row(&[
-            &i.to_string(),
-            &format!("User{}", i),
-            &format!("user{}@example.com", i),
-        ])?;
-    }
-    
-    writer.save()?;
-    Ok(())
-}
-```
-
-**Memory usage in v0.5.1:**
-- **10-30 MB peak** with optimized settings (was 80-100 MB)
-- **80-90% memory reduction** vs v0.4.x
-- Handles 50+ columns with mixed data types
-- Suitable for Kubernetes pods with limited resources
-- Automatic hybrid SST optimization
-
-**Configuration Presets:**
-
-| Preset | Flush | Buffer | Compression | Use Case | Memory Peak |
-|--------|-------|--------|-------------|----------|-------------|
-| **Aggressive** | 100 | 256 KB | Level 1 | <256 MB RAM pods | 10-15 MB |
-| **Balanced** | 500 | 512 KB | Level 3 | <512 MB RAM pods | 15-20 MB |
-| **Default** | 1000 | 1 MB | Level 6 | Standard pods | 20-30 MB |
-| **Conservative** | 5000 | 2 MB | Level 6 | High-memory pods | 25-35 MB |
-
-### PostgreSQL Streaming Export (Production-Tested)
-
-ExcelStream has been tested with real production databases. Example: 430,099 e-invoice records exported successfully.
-
-```rust
-use excelstream::writer::ExcelWriter;
-use postgres::{Client, NoTls};
-
-fn export_database_to_excel() -> Result<(), Box<dyn std::error::Error>> {
-    // Connect to PostgreSQL
-    let mut client = Client::connect(
-        "postgresql://user:password@host:5432/database",
-        NoTls,
-    )?;
-    
-    // Create Excel writer with optimized settings
-    let mut writer = ExcelWriter::with_compression("export.xlsx", 3)?;
-    
-    // Memory-optimized for large datasets
-    writer.set_flush_interval(500);
-    writer.set_max_buffer_size(512 * 1024);
-    
-    // Write header
-    writer.write_header_bold(&[
-        "ID", "Date", "Invoice Number", "Customer", "Amount", "Status"
-    ])?;
-    
-    // Use cursor for streaming (handles millions of rows)
-    let mut transaction = client.transaction()?;
-    transaction.execute("DECLARE export_cursor CURSOR FOR SELECT * FROM invoices", &[])?;
-    
-    let mut total_rows = 0u64;
-    let batch_size = 500; // Optimized batch size
-    
-    loop {
-        let rows = transaction.query(
-            &format!("FETCH {} FROM export_cursor", batch_size),
-            &[],
-        )?;
-        
-        if rows.is_empty() {
-            break;
-        }
-        
-        for row in rows {
-            // Handle NULL values properly
-            let id: i64 = row.get(0);
-            let date: Option<String> = row.try_get(1).ok().flatten();
-            let invoice_no: Option<String> = row.try_get(2).ok().flatten();
-            let customer: Option<String> = row.try_get(3).ok().flatten();
-            let amount: Option<f64> = row.try_get(4).ok().flatten();
-            let status: Option<String> = row.try_get(5).ok().flatten();
-            
-            writer.write_row(&[
-                &id.to_string(),
-                &date.unwrap_or_default(),
-                &invoice_no.unwrap_or_default(),
-                &customer.unwrap_or_default(),
-                &amount.map(|a| format!("{:.2}", a)).unwrap_or_default(),
-                &status.unwrap_or_default(),
-            ])?;
-            
-            total_rows += 1;
-            
-            if total_rows % 10_000 == 0 {
-                println!("Exported {} rows...", total_rows);
-            }
-        }
-    }
-    
-    transaction.execute("CLOSE export_cursor", &[])?;
-    transaction.commit()?;
-    
-    writer.save()?;
-    println!("✅ Exported {} rows successfully!", total_rows);
-    Ok(())
-}
-```
-
-**Production Results (430K rows):**
-- **Duration:** 1m 34s (94.17 seconds)
-- **Throughput:** 4,567 rows/sec
-- **File Size:** 62.22 MB
-- **Memory Peak:** <30 MB
-- **Columns:** 25 mixed data types (int, float, text, dates)
-
-**Key Optimizations:**
-- ✅ Cursor-based streaming (no full table load)
-- ✅ Small batch size (500 rows) for memory efficiency
-- ✅ Proper NULL handling with `try_get().ok().flatten()`
-- ✅ Fast compression (level 3) for balanced performance
-- ✅ Frequent flushing (500 rows) to disk
-
-**See also:** `examples/postgres_streaming.rs` for complete implementation
-
-### Multi-sheet workbook
-
-```rust
-use excelstream::writer::ExcelWriterBuilder;
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = ExcelWriterBuilder::new("multi.xlsx")
-        .with_sheet_name("Sales")
-        .build()?;
-
-    // Sheet 1: Sales
-    writer.write_header(&["Month", "Revenue"])?;
-    writer.write_row(&["Jan", "50000"])?;
-
-    // Sheet 2: Employees
-    writer.add_sheet("Employees")?;
-    writer.write_header(&["Name", "Department"])?;
-    writer.write_row(&["Alice", "Engineering"])?;
-
-    writer.save()?;
-    Ok(())
-}
-```
-
-## ☁️ Cloud-Native Features (v0.10.0)
-
-### S3 Direct Streaming 🔥 (Optimized in v0.12.1)
-
-Stream Excel files **directly to Amazon S3** with **83% less memory usage**!
+**TRUE S3 Streaming** - Zero temp files, async API, constant memory!
 
 ```rust
 use excelstream::cloud::S3ExcelWriter;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Stream directly to S3 - NO local file!
     let mut writer = S3ExcelWriter::builder()
-        .bucket("my-reports")
-        .key("reports/monthly.xlsx")
+        .bucket("my-bucket")
+        .key("report.xlsx")
         .region("us-east-1")
-        .compression_level(6)
         .build()
         .await?;
 
-    writer.write_header_bold(&["Month", "Sales", "Profit"])?;
-    
-    // Write 100K rows - uses only ~15 MB RAM!
-    for i in 1..=100_000 {
-        writer.write_row(&[
-            &format!("Month {}", i),
-            &format!("{}", i * 1000),
-            &format!("{}", i * 250)
-        ])?;
-    }
-
-    // Upload with streaming (5MB chunks) - NO memory spike!
-    writer.save().await?;
-
+    writer.write_header_bold(["Month", "Sales"]).await?;
+    writer.write_row(["January", "50000"]).await?;
+    writer.save().await?; // ✅ Streams directly to S3!
     Ok(())
 }
 ```
 
-**v0.12.1 Optimization - Streaming Upload:**
-- ✅ **83% memory reduction** - Peak: 8.6 MB (was 52.7 MB for 1M rows)
-- ✅ **Constant memory** - Uploads in 5MB chunks (not full file read)
-- ✅ **No memory spike** - Old method read entire file into RAM
-- ✅ **Production tested** - Verified on real S3 (ap-southeast-1)
+**Performance:**
+- **500K rows** → 34 MB peak memory, 94K rows/sec
+- **ZERO temp files** → Works in read-only filesystems (Lambda!)
+- **Breaking change:** S3 methods now async (add `.await`)
 
-**Memory Comparison (100K rows = 5 MB file):**
-| Method | Write Phase | Upload Phase | Peak Memory |
-|--------|-------------|--------------|-------------|
-| OLD | 3.5 MB | **8.5 MB** | 8.5 MB ⚠️ (spike!) |
-| NEW | 3.5 MB | **7.4 MB** | 7.4 MB ✅ (streaming) |
-
-**Benefits:**
-- ✅ **Zero disk usage** - Perfect for Lambda/containers
-- ✅ **Read-only filesystems** - Works in immutable environments
-- ✅ **Low memory** - ~8 MB for 100K rows (was 8.5 MB, improved!)
-- ✅ **Streaming multipart upload** - No full-file-read memory spike
-
-**Use Cases:**
-- AWS Lambda functions
-- Kubernetes CronJobs
-- Serverless data pipelines
-- Docker containers with limited storage
-
-**Prerequisites:**
-```bash
-# Enable cloud-s3 feature
-cargo add excelstream --features cloud-s3
-
-# Configure AWS credentials
-export AWS_ACCESS_KEY_ID=your_key
-export AWS_SECRET_ACCESS_KEY=your_secret
-export AWS_S3_BUCKET=your-bucket
-```
-
-**Run example:**
-```bash
-cargo run --example s3_streaming --features cloud-s3
-```
+[See full changelog](CHANGELOG.md) | [Migration guide](#migration-from-v013)
 
 ---
 
-### HTTP Streaming for Web APIs 🌐 (v0.12.0)
+## 📦 Quick Start
 
-Stream Excel files **directly to HTTP responses** - perfect for web APIs and serverless!
+### Installation
+
+```toml
+[dependencies]
+excelstream = "0.14"
+
+# Optional features
+excelstream = { version = "0.14", features = ["cloud-s3"] }  # S3 support
+```
+
+### Write Excel (Local)
+
+```rust
+use excelstream::ExcelWriter;
+
+let mut writer = ExcelWriter::new("output.xlsx")?;
+
+// Write 1M rows with only 3 MB memory!
+writer.write_header_bold(&["ID", "Name", "Amount"])?;
+for i in 1..=1_000_000 {
+    writer.write_row(&[&i.to_string(), "Item", "1000"])?;
+}
+writer.save()?;
+```
+
+### Read Excel (Streaming)
+
+```rust
+use excelstream::ExcelReader;
+
+let mut reader = ExcelReader::open("large.xlsx")?;
+
+// Process 1 GB file with only 12 MB memory!
+for row in reader.rows("Sheet1")? {
+    let row = row?;
+    println!("{:?}", row.to_strings());
+}
+```
+
+### S3 Streaming (v0.14+)
+
+```rust
+use excelstream::cloud::S3ExcelWriter;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut writer = S3ExcelWriter::builder()
+        .bucket("reports")
+        .key("sales.xlsx")
+        .build()
+        .await?;
+
+    writer.write_header_bold(["Date", "Revenue"]).await?;
+    writer.write_row(["2024-01-01", "125000"]).await?;
+    writer.save().await?;  // Streams to S3, no disk!
+    Ok(())
+}
+```
+
+[More examples →](examples/)
+
+---
+
+## 🎯 Why ExcelStream?
+
+**The Problem:** Traditional libraries load entire files into memory
+
+```rust
+// ❌ Traditional: 1 GB file = 1+ GB RAM (OOM in containers!)
+let workbook = Workbook::new("huge.xlsx")?;
+```
+
+**The Solution:** True streaming with constant memory
+
+```rust
+// ✅ ExcelStream: 1 GB file = 12 MB RAM
+let mut reader = ExcelReader::open("huge.xlsx")?;
+for row in reader.rows("Sheet1")? { /* streaming! */ }
+```
+
+### Performance Comparison
+
+| Operation | Traditional | ExcelStream | Improvement |
+|-----------|-------------|-------------|-------------|
+| Write 1M rows | 100+ MB | **2.7 MB** | **97% less memory** |
+| Read 1GB file | ❌ Crash | **12 MB** | Works! |
+| S3 upload 500K rows | Temp file | **34 MB** | **Zero disk** |
+| K8s pod (256MB) | ❌ OOMKilled | ✅ Works | Production ready |
+
+---
+
+## ☁️ Cloud Features
+
+### S3 Direct Streaming (v0.14)
+
+Upload Excel files directly to S3 with **ZERO temp files**:
+
+```bash
+cargo add excelstream --features cloud-s3
+```
+
+**Performance (Real AWS S3):**
+
+| Dataset | Memory | Throughput | Temp Files |
+|---------|--------|------------|------------|
+| 10K rows | 15 MB | 11K rows/s | **ZERO** ✅ |
+| 100K rows | 23 MB | 45K rows/s | **ZERO** ✅ |
+| 500K rows | 34 MB | 94K rows/s | **ZERO** ✅ |
+
+Perfect for:
+- ✅ AWS Lambda (read-only filesystem)
+- ✅ Docker containers (no disk space)
+- ✅ Kubernetes CronJobs (limited memory)
+
+[See S3 performance details →](PERFORMANCE_S3.md)
+
+### HTTP Streaming
+
+Stream Excel files directly to web responses:
 
 ```rust
 use excelstream::cloud::HttpExcelWriter;
-use axum::{
-    response::{IntoResponse, Response},
-    http::header,
-};
 
-async fn download_report() -> Response {
+async fn download() -> impl IntoResponse {
     let mut writer = HttpExcelWriter::new();
-
-    writer.write_header_bold(&["Month", "Sales", "Profit"]).unwrap();
-    writer.write_row_typed(&[
-        CellValue::String("January".to_string()),
-        CellValue::Float(125000.50),
-        CellValue::Float(45000.25),
-    ]).unwrap();
-
-    let bytes = writer.finish().unwrap();
-
-    (
-        [
-            (header::CONTENT_TYPE, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
-            (header::CONTENT_DISPOSITION, "attachment; filename=\"report.xlsx\""),
-        ],
-        bytes
-    ).into_response()
+    writer.write_row(&["Data"])?;
+    ([(header::CONTENT_TYPE, "application/vnd....")], writer.finish()?)
 }
 ```
 
-**Benefits:**
-- ✅ **In-memory generation** - No temp files needed
-- ✅ **Framework agnostic** - Works with Axum, Actix-web, Warp, etc.
-- ✅ **Memory efficient** - Peak memory ≈ file size + 5-10MB overhead
-- ✅ **Full Excel support** - All cell types, formulas, multiple sheets
-- ✅ **Fast compression** - Configurable compression levels (0-9)
-
-**Performance:**
-
-| Dataset | File Size | Peak Memory | Generation Time |
-|---------|-----------|-------------|-----------------|
-| 1K rows | ~37 KB | ~5 MB | <5 ms |
-| 10K rows | ~335 KB | ~10 MB | ~50 ms |
-| 100K rows | ~3.3 MB | ~65 MB | ~500 ms |
-
-**Use Cases:**
-- REST API `/download/report` endpoints
-- Serverless functions (AWS Lambda, Cloudflare Workers)
-- Real-time data exports
-- Dashboard download features
-
-**Prerequisites:**
-```bash
-# Enable cloud-http feature
-cargo add excelstream --features cloud-http
-```
-
-**Complete Example:**
-```bash
-# Run HTTP streaming server
-cargo run --example http_streaming --features cloud-http
-
-# Download reports
-curl -o report.xlsx http://localhost:3000/download/sales-report
-curl -o large.xlsx http://localhost:3000/download/large-dataset
-```
-
-**Limitations:**
-- ⚠️ **Memory spike** - `.finish()` loads entire file into memory
-- ⚠️ **Not suitable for >100MB files** - Use file-based approach instead
-- ⚠️ **Blocking final read** - Async version coming soon
-
-**See also:** [HTTP_STREAMING.md](HTTP_STREAMING.md) - Complete HTTP streaming documentation
+[HTTP streaming guide →](examples/http_streaming.rs)
 
 ---
 
-### Incremental Append Mode 🚀
+## 📊 CSV Support
 
-Append rows to existing Excel files **10-100x faster** than rewriting!
-
-```rust
-use excelstream::append::AppendableExcelWriter;
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Open existing file for appending
-    let mut writer = AppendableExcelWriter::open("monthly_log.xlsx")?;
-    writer.select_sheet("Log")?;
-
-    // Append new rows - only writes NEW data!
-    writer.append_row(&["2024-12-10", "New entry", "Active"])?;
-    writer.append_row(&["2024-12-11", "Another entry", "Pending"])?;
-
-    writer.save()?; // Only updates modified parts - FAST!
-
-    Ok(())
-}
-```
-
-**Benefits:**
-- ✅ **10-100x faster** - No need to read/rewrite entire file
-- ✅ **Constant memory** - Doesn't load existing data
-- ✅ **Atomic operations** - Safe for concurrent access
-- ✅ **Preserves formatting** - Keeps existing styles, formulas
-
-**Performance Comparison:**
-
-| Operation | Traditional | Incremental Append | Speedup |
-|-----------|-------------|-------------------|---------|
-| 100MB file (1M rows) | 30-60 seconds | 0.5-2 seconds | **15-100x faster** |
-| 10MB file (100K rows) | 5-10 seconds | 0.2-0.5 seconds | **10-50x faster** |
-| Memory usage | Full file in RAM | Constant ~5 MB | **20-100x less** |
-
-**Use Cases:**
-- Daily data appends to monthly/yearly reports
-- Real-time logging to Excel
-- Incremental ETL pipelines
-- Multi-user data collection (with file locking)
-
-**Run example:**
-```bash
-cargo run --example incremental_append
-```
-
-**Note:** Full ZIP modification support is in development. Current implementation provides the API infrastructure for future completion.
-
-## 📚 Examples
-
-The `examples/` directory contains detailed examples:
-
-**Basic Usage:**
-- `basic_read.rs` - Basic Excel file reading
-- `basic_write.rs` - Basic Excel file writing
-- `streaming_read.rs` - Reading large files with streaming
-- `streaming_write.rs` - Writing large files with streaming
-
-**CSV Support (v0.13.0):**
-- `csv_write.rs` - CSV writing with plain/Zstd/Deflate compression
-- `csv_read.rs` - CSV reading with auto-decompression
-- `csv_excel_comparison.rs` - **Performance benchmark: CSV vs Excel** (recommended!)
-- `test_zstd.rs` - Zstd compression level testing
-
-**Performance Comparisons:**
-- `writers_comparison.rs` - **Compare all writer types** (recommended!)
-- `memory_benchmark.rs` - Memory usage benchmarking
-- `memory_benchmark_read.rs` - Read memory benchmarking
-- `csv_excel_comparison.rs` - **CSV vs Excel performance** (NEW in v0.13.0!)
-
-**Advanced Features:**
-- `csv_to_excel.rs` - CSV to Excel conversion
-- `multi_sheet.rs` - Creating multi-sheet workbooks
-- `cell_formatting.rs` - Cell formatting and styling examples
-- `worksheet_protection.rs` - Worksheet protection demo
-
-**PostgreSQL Integration:**
-- `postgres_streaming.rs` - Production-tested streaming export (430K rows)
-- `postgres_to_excel_advanced.rs` - Advanced async with connection pooling
-
-**Cloud & HTTP Streaming:**
-- `s3_streaming.rs` - Direct S3 upload (requires AWS credentials)
-- `http_streaming.rs` - HTTP Excel streaming with Axum (3 endpoints demo)
-- `http_memory_test.rs` - Memory profiling for HTTP streaming
-
-Running examples:
-
-```bash
-# Create sample data first
-cargo run --example basic_write
-
-# Read Excel file
-cargo run --example basic_read
-
-# Streaming with large files
-cargo run --example streaming_write
-cargo run --example streaming_read
-
-# CSV Examples (v0.13.0 - NEW!)
-cargo run --example csv_write               # CSV writing with compression
-cargo run --example csv_read                # CSV reading with auto-decompression
-cargo run --release --example csv_excel_comparison  # CSV vs Excel benchmark (RECOMMENDED!)
-cargo run --example test_zstd               # Test Zstd compression levels
-
-# Performance comparisons (RECOMMENDED)
-cargo run --release --example writers_comparison         # Compare all writers
-cargo run --release --example memory_benchmark           # Memory benchmarking
-cargo run --release --example csv_excel_comparison       # CSV vs Excel (NEW!)
-
-# Advanced features
-cargo run --example multi_sheet                          # Multi-sheet workbooks
-cargo run --example cell_formatting                      # Cell formatting examples
-cargo run --example worksheet_protection                 # Worksheet protection
-cargo run --example csv_to_excel                         # CSV to Excel conversion
-
-# PostgreSQL examples (requires database setup)
-cargo run --example postgres_streaming --features postgres         # Production-tested 430K rows
-cargo run --example postgres_to_excel_advanced --features postgres-async  # Advanced async
-
-# Cloud & HTTP streaming examples
-cargo run --example s3_streaming --features cloud-s3  # Requires AWS credentials
-cargo run --example http_streaming --features cloud-http  # HTTP server on port 3000
-cargo run --release --example http_memory_test --features cloud-http  # Memory profiling
-```
-
-## 📊 CSV Support (v0.13.0)
-
-**New in v0.13.0:** High-performance CSV read/write with Zstd compression and HTTP streaming!
-
-### Why ExcelStream for CSV?
-
-ExcelStream provides the **fastest CSV writer in Rust** with exceptional compression and streaming capabilities:
-
-**Performance Highlights:**
-- ✅ **13.5x faster than Excel** - 1.2M rows/sec vs 91K rows/sec
-- ✅ **2.9x better compression** - Zstd achieves 35% of original size
-- ✅ **Ultra-low memory** - < 5MB constant usage for any file size
-- ✅ **HTTP streaming** - Stream CSV files directly via web APIs
-- ✅ **Auto-detection** - Automatically detects .csv, .csv.zst, .csv.gz formats
-
-### CSV Quick Start
-
-#### Writing CSV Files
+**13.5x faster** than Excel for CSV workloads:
 
 ```rust
-use excelstream::CsvWriter;
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Create plain CSV writer
-    let mut writer = CsvWriter::new("output.csv")?;
-
-    // Write header
-    writer.write_row(&["Name", "Age", "City"])?;
-
-    // Write data rows
-    writer.write_row(&["Alice", "30", "New York"])?;
-    writer.write_row(&["Bob", "25", "San Francisco"])?;
-
-    // Save file
-    writer.save()?;
-
-    Ok(())
-}
-```
-
-#### Reading CSV Files
-
-```rust
-use excelstream::CsvReader;
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Open CSV file (auto-detects compression)
-    let mut reader = CsvReader::open("output.csv")?
-        .has_header(true);
-
-    // Print headers
-    println!("Headers: {:?}", reader.headers());
-
-    // Stream rows one by one
-    for row_result in reader.rows() {
-        let row = row_result?;
-        println!("Row: {:?}", row);
-    }
-
-    Ok(())
-}
-```
-
-### CSV with Zstd Compression
-
-Zstd compression provides **2.9x better compression** than plain CSV with minimal performance impact:
-
-```rust
-use excelstream::{CsvWriter, CompressionMethod};
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Write with Zstd compression (level 3)
-    let mut writer = CsvWriter::with_compression(
-        "large.csv.zst",
-        CompressionMethod::Zstd,
-        3
-    )?;
-
-    writer.write_row(&["ID", "Product", "Price", "Stock"])?;
-
-    // Write 100K rows with constant memory usage
-    for i in 0..100_000 {
-        writer.write_row(&[
-            &i.to_string(),
-            &format!("Product_{}", i),
-            &format!("{:.2}", i as f64 * 9.99),
-            &(i % 1000).to_string(),
-        ])?;
-    }
-
-    writer.save()?;
-    println!("Compressed CSV saved!");
-
-    Ok(())
-}
-```
-
-**Auto-Detection from File Extension:**
-```rust
-// Plain CSV
-let mut writer = CsvWriter::new("data.csv")?;
-
-// Zstd compressed (auto-detected)
-let mut writer = CsvWriter::new("data.csv.zst")?;
-
-// Deflate/Gzip compressed (auto-detected)
-let mut writer = CsvWriter::new("data.csv.gz")?;
-```
-
-**Reading Compressed CSV:**
-```rust
-use excelstream::CsvReader;
-
-// Automatically decompresses Zstd/Deflate/Gzip files
-let mut reader = CsvReader::open("large.csv.zst")?;
-
-for row_result in reader.rows() {
-    let row = row_result?;
-    println!("{:?}", row);
-}
-```
-
-### HTTP CSV Streaming for Web APIs
-
-Stream CSV files **directly to HTTP responses** - perfect for web APIs!
-
-```rust
-use excelstream::HttpCsvWriter;
-use axum::{
-    response::{IntoResponse, Response},
-    http::header,
-};
-
-async fn download_csv_report() -> Response {
-    let mut writer = HttpCsvWriter::new();
-
-    // Write header
-    writer.write_row(&["Month", "Sales", "Profit"]).unwrap();
-
-    // Write data
-    writer.write_row(&["January", "125000", "45000"]).unwrap();
-    writer.write_row(&["February", "135000", "52000"]).unwrap();
-    writer.write_row(&["March", "142000", "58000"]).unwrap();
-
-    // Get bytes
-    let bytes = writer.finish().unwrap();
-
-    (
-        [
-            (header::CONTENT_TYPE, "text/csv"),
-            (header::CONTENT_DISPOSITION, "attachment; filename=\"report.csv\""),
-        ],
-        bytes
-    ).into_response()
-}
-
-// With compression
-async fn download_csv_compressed() -> Response {
-    let mut writer = HttpCsvWriter::with_compression(6);
-
-    writer.write_row(&["ID", "Name", "Value"]).unwrap();
-
-    for i in 0..10_000 {
-        writer.write_row(&[
-            &i.to_string(),
-            &format!("Item_{}", i),
-            &(i * 100).to_string(),
-        ]).unwrap();
-    }
-
-    let bytes = writer.finish().unwrap();
-
-    (
-        [
-            (header::CONTENT_TYPE, "application/zip"),
-            (header::CONTENT_DISPOSITION, "attachment; filename=\"report.csv.gz\""),
-        ],
-        bytes
-    ).into_response()
-}
-```
-
-**Benefits:**
-- ✅ **In-memory generation** - No temp files needed
-- ✅ **Framework agnostic** - Works with Axum, Actix-web, Warp, etc.
-- ✅ **Memory efficient** - < 5MB for typical datasets
-- ✅ **Fast compression** - Deflate compression (levels 0-9)
-
-### CSV vs Excel Performance Comparison
-
-Benchmarked with **100,000 rows × 10 columns** on production hardware:
-
-| Format | Speed (rows/sec) | File Size | Compression Ratio | Use Case |
-|--------|-----------------|-----------|-------------------|----------|
-| **CSV Plain** | **1,234,383** ⚡ | 9.60 MB | 100% (baseline) | Maximum speed |
-| **CSV Zstd (L3)** | **572,318** | 3.36 MB | **35%** 🗜️ | Best compression |
-| **CSV Gzip (L6)** | **207,688** | 4.35 MB | 45.3% | Wide compatibility |
-| **Excel XLSX** | 91,215 | 7.80 MB | 81.2% | Rich formatting |
-
-**Key Insights:**
-- ✅ **CSV Plain is 13.5x faster** than Excel writing
-- ✅ **Zstd compression** achieves 2.9x compression ratio
-- ✅ **Zstd is 6.3x faster** than Excel with better compression
-- ✅ **Memory usage < 5 MB** constant for all formats
-
-### CSV with Typed Values
-
-Write typed data with automatic string conversion:
-
-```rust
-use excelstream::{CsvWriter, CellValue};
+use excelstream::csv::CsvWriter;
 
 let mut writer = CsvWriter::new("data.csv")?;
-
-// Write typed values
-writer.write_row_typed(&[
-    CellValue::String("Alice".to_string()),
-    CellValue::Int(30),
-    CellValue::Float(75000.50),
-    CellValue::Bool(true),
-])?;
-
-// Output: "Alice,30,75000.5,true"
+writer.write_row(&["A", "B", "C"])?;  // 1.2M rows/sec!
 writer.save()?;
 ```
 
-### CSV Edge Cases Handling
+**Features:**
+- ✅ Zstd compression (`.csv.zst` - 2.9x smaller)
+- ✅ Auto-detection (`.csv`, `.csv.gz`, `.csv.zst`)
+- ✅ Streaming (< 5 MB memory)
 
-ExcelStream properly handles all RFC 4180-like CSV edge cases:
-
-```rust
-use excelstream::CsvWriter;
-
-let mut writer = CsvWriter::new("edge_cases.csv")?;
-
-// Commas inside fields → Quoted
-writer.write_row(&["Name", "Address", "Phone"])?;
-writer.write_row(&["Alice", "123 Main St, Apt 4", "555-0001"])?;
-// Output: Alice,"123 Main St, Apt 4",555-0001
-
-// Quotes inside fields → Escaped by doubling
-writer.write_row(&["Bob", "Say \"Hello\"", "555-0002"])?;
-// Output: Bob,"Say ""Hello""",555-0002
-
-// Newlines inside fields → Quoted
-writer.write_row(&["Charlie", "Line 1\nLine 2", "555-0003"])?;
-// Output: Charlie,"Line 1
-// Line 2",555-0003
-
-// Empty fields → Preserved
-writer.write_row(&["David", "", "555-0004"])?;
-// Output: David,,555-0004
-
-writer.save()?;
-```
-
-### Custom Delimiters and Quotes
-
-```rust
-use excelstream::CsvWriter;
-
-// Tab-separated values (TSV)
-let mut writer = CsvWriter::new("data.tsv")?
-    .delimiter(b'\t')
-    .quote_char(b'\'');
-
-writer.write_row(&["Name", "Age", "City"])?;
-writer.write_row(&["Alice", "30", "New York"])?;
-// Output: Name\tAge\tCity\nAlice\t30\tNew York\n
-
-writer.save()?;
-```
-
-### CSV Examples
-
-All CSV examples are available in the `examples/` directory:
-
-```bash
-# Basic CSV write
-cargo run --example csv_write
-
-# Basic CSV read
-cargo run --example csv_read
-
-# Performance comparison: CSV vs Excel
-cargo run --release --example csv_excel_comparison
-
-# Test Zstd compression levels
-cargo run --example test_zstd
-```
-
-### CSV API Reference
-
-**CsvWriter:**
-- `new(path)` - Create writer (auto-detects compression from extension)
-- `with_compression(path, method, level)` - Explicit compression control
-- `write_row<I>(&mut self, data: I)` - Write row of strings
-- `write_row_typed(&mut self, cells: &[CellValue])` - Write typed values
-- `delimiter(char)` - Set custom delimiter (builder pattern)
-- `quote_char(char)` - Set custom quote character (builder pattern)
-- `save(self)` - Flush and close file
-- `row_count(&self)` - Get number of rows written
-
-**CsvReader:**
-- `open(path)` - Open CSV (auto-detects compression)
-- `has_header(bool)` - Parse first row as headers (builder pattern)
-- `delimiter(char)` - Set custom delimiter (builder pattern)
-- `read_row()` - Read single row as `Option<Vec<String>>`
-- `rows()` - Get streaming iterator
-- `headers()` - Get header row if available
-
-**HttpCsvWriter:**
-- `new()` - Create uncompressed writer
-- `with_compression(level)` - Create with Deflate compression (0-9)
-- `write_row<I>(&mut self, data: I)` - Write row of strings
-- `write_row_typed(&mut self, cells: &[CellValue])` - Write typed values
-- `delimiter(char)` - Set custom delimiter (builder pattern)
-- `quote_char(char)` - Set custom quote character (builder pattern)
-- `finish(self)` - Get final bytes as `Vec<u8>`
-- `row_count(&self)` - Get number of rows written
-
-**CompressionMethod:**
-- `CompressionMethod::Zstd` - Zstd compression (best ratio, levels 1-21)
-- `CompressionMethod::Deflate` - Deflate/Gzip compression (wide compatibility, levels 0-9)
-
-### CSV Performance Tips
-
-**For Maximum Speed:**
-```rust
-// Plain CSV - no compression overhead
-let mut writer = CsvWriter::new("data.csv")?;
-// Achieves 1.2M rows/sec
-```
-
-**For Best Compression:**
-```rust
-// Zstd level 3 - excellent balance
-let mut writer = CsvWriter::with_compression(
-    "data.csv.zst",
-    CompressionMethod::Zstd,
-    3
-)?;
-// Achieves 572K rows/sec, 2.9x compression
-```
-
-**For Wide Compatibility:**
-```rust
-// Deflate/Gzip - works everywhere
-let mut writer = CsvWriter::with_compression(
-    "data.csv.gz",
-    CompressionMethod::Deflate,
-    6
-)?;
-// Achieves 208K rows/sec, 2.2x compression
-```
-
-**For Web APIs:**
-```rust
-// HTTP streaming - in-memory generation
-let mut writer = HttpCsvWriter::new();
-// Or with compression:
-let mut writer = HttpCsvWriter::with_compression(6);
-```
+[CSV examples →](examples/csv_write.rs)
 
 ---
 
-## 🔧 API Documentation
+## 🚀 Use Cases
 
-### ExcelReader
-
-- `open(path)` - Open Excel file for reading
-- `sheet_names()` - Get list of sheet names
-- `rows(sheet_name)` - Iterator for streaming row reading
-- `read_cell(sheet, row, col)` - Read specific cell
-- `dimensions(sheet_name)` - Get sheet dimensions (rows, cols)
-
-### ExcelWriter (Streaming)
-
-- `new(path)` - Create new writer with default compression (level 6)
-- `with_compression(path, level)` - Create with custom compression level (0-9)
-- `write_row(data)` - Write row with strings
-- `write_row_typed(cells)` - Write row with typed values (recommended)
-- `write_header(headers)` - Write header row
-- `write_header_bold(headers)` - Write bold header row
-- `write_row_styled(cells)` - Write row with individual cell styles
-- `write_row_with_style(cells, style)` - Write row with uniform style
-- `add_sheet(name)` - Add new sheet
-- `set_flush_interval(rows)` - Configure flush frequency (default: 1000)
-- `set_max_buffer_size(bytes)` - Configure buffer size (default: 1MB)
-- `set_compression_level(level)` - Set compression level (0-9, default: 6)
-- `compression_level()` - Get current compression level
-- `set_column_width(col, width)` - Set column width (before writing rows)
-- `set_next_row_height(height)` - Set height for next row
-- `save()` - Save and finalize workbook
-
-### FastWorkbook (Direct Access)
-
-- `new(path)` - Create fast writer with default compression (level 6)
-- `with_compression(path, level)` - Create with custom compression level (0-9)
-- `add_worksheet(name)` - Add worksheet
-- `write_row(data)` - Write row (optimized)
-- `set_flush_interval(rows)` - Set flush frequency
-- `set_max_buffer_size(bytes)` - Set buffer limit
-- `set_compression_level(level)` - Set compression level (0-9)
-- `compression_level()` - Get current compression level
-- `close()` - Finish and save file
-
-### Types
-
-- `CellValue` - Enum: Empty, String, Int, Float, Bool, DateTime, Error, Formula
-- `Row` - Row with index and cells vector
-- `Cell` - Cell with position (row, col) and value
-
-## 🎯 Use Cases
-
-### Processing Large Excel Files (100MB+)
+### 1. Large File Processing
 
 ```rust
-// Streaming ensures only small portions are loaded into memory
-let mut reader = ExcelReader::open("huge_file.xlsx")?;
-let mut total = 0.0;
-
-for row_result in reader.rows("Sheet1")? {
-    let row = row_result?;
-    if let Some(val) = row.get(2).and_then(|c| c.as_f64()) {
-        total += val;
-    }
+// Process 500 MB Excel with only 25 MB RAM
+let mut reader = ExcelReader::open("customers.xlsx")?;
+for row in reader.rows("Sales")? {
+    // Process row-by-row, constant memory!
 }
 ```
 
-### Exporting Database to Excel
+### 2. Database Exports
 
 ```rust
+// Export 1M database rows to Excel
 let mut writer = ExcelWriter::new("export.xlsx")?;
-writer.write_header(&["ID", "Name", "Created"])?;
-
-// Fetch from database and write directly
-for record in database.query("SELECT * FROM users")? {
-    writer.write_row(&[
-        &record.id.to_string(),
-        &record.name,
-        &record.created_at.to_string(),
-    ])?;
+let rows = db.query("SELECT * FROM large_table")?;
+for row in rows {
+    writer.write_row(&[row.get(0), row.get(1)])?;
 }
-
-writer.save()?;
+writer.save()?;  // Only 3 MB memory used!
 ```
 
-### Converting CSV to Excel
+### 3. Cloud Pipelines
 
 ```rust
-use std::fs::File;
-use std::io::{BufRead, BufReader};
+// Lambda function: DB → Excel → S3
+let mut writer = S3ExcelWriter::builder()
+    .bucket("data-lake").key("export.xlsx").build().await?;
 
-let csv = BufReader::new(File::open("data.csv")?);
-let mut writer = ExcelWriter::new("output.xlsx")?;
-
-for (i, line) in csv.lines().enumerate() {
-    let fields: Vec<&str> = line?.split(',').collect();
-    if i == 0 {
-        writer.write_header(fields)?;
-    } else {
-        writer.write_row(fields)?;
-    }
+let rows = db.query_stream("SELECT * FROM events").await?;
+while let Some(row) = rows.next().await {
+    writer.write_row(row).await?;
 }
-
-writer.save()?;
+writer.save().await?;  // No temp files, no disk!
 ```
+
+---
+
+## 📚 Documentation
+
+- [API Docs](https://docs.rs/excelstream) - Full API reference
+- [Examples](examples/) - Code examples for all features
+- [CHANGELOG](CHANGELOG.md) - Version history
+- [Performance](PERFORMANCE_S3.md) - Detailed benchmarks
+
+### Key Topics
+
+- [Excel Writing](examples/basic_write.rs) - Basic & advanced writing
+- [Excel Reading](examples/basic_read.rs) - Streaming read
+- [S3 Streaming](examples/s3_streaming.rs) - Cloud uploads
+- [CSV Support](examples/csv_write.rs) - CSV operations
+- [Styling](examples/cell_formatting.rs) - Cell formatting & colors
+
+---
+
+## 🔧 Features
+
+| Feature | Description |
+|---------|-------------|
+| `default` | Core Excel/CSV with Zstd compression |
+| `cloud-s3` | S3 direct streaming (async) |
+| `cloud-http` | HTTP response streaming |
+| `serde` | Serde serialization support |
+| `parallel` | Parallel processing with Rayon |
+
+---
 
 ## ⚡ Performance
 
-### Write Performance
+**Memory Usage (Constant):**
+- Excel write: **2.7 MB** (any size)
+- Excel read: **10-12 MB** (any size)
+- S3 streaming: **30-35 MB** (any size)
+- CSV write: **< 5 MB** (any size)
 
-Benchmarked with **1 million rows × 30 columns** (mixed data types):
-
-| Writer Method | Throughput | Memory Usage | Features |
-|--------------|------------|--------------|----------|
-| **UltraLowMemoryWorkbook** (direct) | **69,500 rows/sec** ⚡ | **~80MB constant** ✅ | **FASTEST** - Low-level API, max control |
-| **ExcelWriter.write_row_typed()** | **62,700 rows/sec** | **~80MB constant** ✅ | Type-safe, best balance (+2% vs baseline) |
-| **ExcelWriter.write_row()** | **61,400 rows/sec** | **~80MB constant** ✅ | Simple API, string-based (baseline) |
-| **ExcelWriter.write_row_styled()** | **43,500 rows/sec** | **~80MB constant** ✅ | Cell formatting - 29% slower due to styling overhead |
-
-**Key Characteristics:**
-- ✅ **High throughput** - 43K-70K rows/sec depending on method
-- ✅ **Constant memory** - stays at ~80MB regardless of dataset size
-- ✅ **Streaming write** - data written directly to disk via ZIP
-- ✅ **Predictable performance** - no memory spikes or slowdowns
-- ⚡ **UltraLowMemoryWorkbook is FASTEST** - Direct low-level access (+13% vs baseline)
-- ⚠️ **Styling has overhead** - write_row_styled() is 29% slower but adds formatting
-
-### Cloud Upload Performance (v0.12.1)
-
-Memory usage comparison for different upload methods (100K rows):
-
-| Writer Type | Write Phase | Upload Phase | Peak Memory | Pattern |
-|-------------|-------------|--------------|-------------|---------|
-| **File-based** | 3.5 MB | N/A | **3.5 MB** ✅ | Constant (streams to disk) |
-| **HTTP** | 3.5→7.5 MB | 8.4 MB | **8.4 MB** | Linear growth (in-memory) |
-| **S3 (v0.12.1)** | 3.5 MB | 7.4 MB | **7.4 MB** ✅ | Constant (streaming upload) |
-| **S3 (OLD)** | 3.5 MB | **8.5 MB** | **8.5 MB** ❌ | Spike on upload |
-
-**S3 Streaming Optimization (v0.12.1):**
-- ✅ **83% memory reduction** - 8.6 MB peak (was 52.7 MB for 1M rows)
-- ✅ **Streaming upload** - Uploads in 5MB chunks instead of reading entire file
-- ✅ **No memory spike** - Old method loaded full file into RAM
-- ✅ **Production tested** - Verified on AWS S3 (ap-southeast-1)
-
-### Recommendations
-
-| Use Case | Recommended Method | Why |
-|----------|-------------------|-----|
-| **General use** | `write_row_typed()` | **Best balance** - Type-safe, fast (62.7K rows/sec, +2%) |
-| **Simple exports** | `write_row()` | Easy API, good performance (61.4K rows/sec) |
-| **Formatted reports** | `write_row_styled()` | Cell formatting - slower but worth it (43.5K rows/sec, -29%) |
-| **Maximum speed** | `UltraLowMemoryWorkbook` | **FASTEST** - Direct low-level access (69.5K rows/sec, +13%) |
-
-## 📖 Documentation
-
-- **README.md** (this file) - Complete guide with examples
-- [CONTRIBUTING.md](CONTRIBUTING.md) - How to contribute
-- [CHANGELOG.md](CHANGELOG.md) - Version history
-- Examples in `/examples` directory
-- Doc tests in source code
-
-## 🛠️ Development
-
-### Build
-
-```bash
-cargo build --release
-```
-
-### Test
-
-```bash
-cargo test
-```
-
-### Run examples
-
-```bash
-cargo run --example basic_write
-cargo run --example streaming_read
-```
-
-### Benchmark
-
-```bash
-cargo bench
-```
-
-## 📋 Requirements
-
-- Rust 1.70 or higher
-- Dependencies:
-  - `zip` - ZIP compression for reading/writing
-  - `thiserror` - Error handling
-  - **No calamine** - Custom XML streaming parser (v0.8.0+)
-
-## 🚀 Production Ready
-
-- ✅ **Battle-tested** - Handles 1M+ row datasets with ease
-- ✅ **High performance** - 43K-70K rows/sec depending on method (UltraLowMemoryWorkbook fastest!)
-- ✅ **Memory efficient** - Constant ~80MB usage, perfect for K8s pods
-- ✅ **Reliable** - 50+ comprehensive tests covering edge cases
-- ✅ **Safe** - Zero unsafe code, full Rust memory safety
-- ✅ **Compatible** - Excel, LibreOffice, Google Sheets
-- ✅ **Unicode support** - Special characters, emojis, CJK
-- ✅ **CI/CD** - Automated testing on every commit
-
-## 🤝 Contributing
-
-Contributions welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-**Areas for Contribution:**
-- Cell formatting and styling (Phase 3)
-- Conditional formatting
-- Charts and images support
-- More examples and documentation
-- Performance optimizations
-
-All contributions must:
-- Pass `cargo fmt --check`
-- Pass `cargo clippy -- -D warnings`
-- Pass all tests `cargo test --all-features`
-- Include tests for new features
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## 🙏 Credits
-
-This library uses:
-- Custom XML streaming parser - Chunked reading for constant memory (v0.8.0+)
-- Custom FastWorkbook - High-performance streaming writer
-- No external Excel dependencies (calamine removed in v0.8.0)
-
-## 📧 Contact
-
-For questions or suggestions, please create an issue on GitHub.
+**Throughput:**
+- Excel write: 42K rows/sec
+- Excel read: 50K rows/sec
+- S3 streaming: 94K rows/sec
+- CSV write: 1.2M rows/sec
 
 ---
 
-Made with ❤️ and 🦀 by the Rust community
+## 🛠️ Migration from v0.13
+
+**S3ExcelWriter** is now async:
+
+```rust
+// OLD (v0.13 - sync)
+writer.write_row(&["a", "b"])?;
+
+// NEW (v0.14 - async)
+writer.write_row(["a", "b"]).await?;
+```
+
+All other APIs unchanged!
+
+---
+
+## 📋 Requirements
+
+- Rust 1.70+
+- Optional: AWS credentials for S3 features
+
+---
+
+## 🤝 Contributing
+
+Contributions welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
+
+## 📄 License
+
+MIT License - See [LICENSE](LICENSE) for details
+
+---
+
+## 🙏 Credits
+
+- Built with [s-zip](https://crates.io/crates/s-zip) for streaming ZIP
+- AWS SDK for Rust
+- All contributors and users!
+
+---
+
+**Need help?** [Open an issue](https://github.com/KSD-CO/excelstream/issues) | **Questions?** [Discussions](https://github.com/KSD-CO/excelstream/discussions)

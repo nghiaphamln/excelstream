@@ -1,12 +1,12 @@
 [package]
 name = "excelstream"
-version = "0.13.0"
+version = "0.14.0"
 edition = "2021"
 authors = ["Ton That Vu <ttvuhm@gmail.com>"]
-description = "High-performance streaming Excel & CSV library - Read/write large XLSX/CSV files with ultra-low memory and Zstd compression"
+description = "High-performance streaming Excel & CSV library with S3 cloud support - Read/write large XLSX/CSV files with ultra-low memory"
 license = "MIT"
 repository = "https://github.com/KSD-CO/excelstream"
-keywords = ["excel", "xlsx", "csv", "streaming", "zstd"]
+keywords = ["excel", "xlsx", "csv", "streaming", "s3"]
 categories = ["parsing", "encoding"]
 exclude = [
     "*.xlsx",
@@ -26,8 +26,8 @@ rayon = { version = "1.8", optional = true }
 indexmap = "2"
 chrono = { version = "0.4", features = ["clock"] }
 itoa = "1.0"
-# s-zip for streaming ZIP operations (with Zstd compression support)
-s-zip = { version = "0.3.1", features = ["zstd-support"] }
+# s-zip for streaming ZIP operations (with Zstd compression and cloud storage support)
+s-zip = { version = "0.5.1", default-features = false }
 
 # Optional features (only enabled when needed)
 # PostgreSQL support (for examples)
@@ -36,7 +36,7 @@ tokio-postgres = { version = "0.7", features = ["with-chrono-0_4"], optional = t
 deadpool-postgres = { version = "0.14", optional = true }
 tokio = { version = "1", features = ["full"], optional = true }
 
-# Cloud storage support (for examples)
+# Cloud storage support
 aws-config = { version = "1.0", optional = true }
 aws-sdk-s3 = { version = "1.0", optional = true }
 tempfile = { version = "3.8", optional = true }
@@ -49,12 +49,12 @@ tempfile = "3.8"
 criterion = "0.5"
 
 [features]
-default = []
+default = ["s-zip/zstd-support"]
 serde = ["dep:serde"]
 parallel = ["dep:rayon"]
 postgres = ["dep:postgres"]
 postgres-async = ["dep:tokio-postgres", "dep:deadpool-postgres", "dep:tokio"]
-cloud-s3 = ["dep:aws-config", "dep:aws-sdk-s3", "dep:tokio", "dep:tempfile"]
+cloud-s3 = ["dep:aws-config", "dep:aws-sdk-s3", "dep:tokio", "dep:tempfile", "s-zip/cloud-s3"]
 cloud-http = ["dep:axum", "dep:tokio", "dep:tempfile"]
 cloud-gcs = []  # Placeholder for future
 cloud-azure = []  # Placeholder for future
