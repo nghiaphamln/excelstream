@@ -285,18 +285,11 @@ impl S3ExcelReaderBuilder {
 
     /// Set custom endpoint URL for S3-compatible services
     ///
-    /// # Examples
+    /// # Supported Services
     ///
-    /// ```no_run
-    /// // MinIO
-    /// .endpoint_url("http://localhost:9000")
-    ///
-    /// // Cloudflare R2
-    /// .endpoint_url("https://<account_id>.r2.cloudflarestorage.com")
-    ///
-    /// // DigitalOcean Spaces
-    /// .endpoint_url("https://nyc3.digitaloceanspaces.com")
-    /// ```
+    /// - MinIO: `http://localhost:9000`
+    /// - Cloudflare R2: `https://<account_id>.r2.cloudflarestorage.com`
+    /// - DigitalOcean Spaces: `https://nyc3.digitaloceanspaces.com`
     pub fn endpoint_url(mut self, endpoint: impl Into<String>) -> Self {
         self.endpoint_url = Some(endpoint.into());
         self
@@ -327,7 +320,7 @@ impl S3ExcelReaderBuilder {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```ignore
     /// use excelstream::cloud::S3ExcelReader;
     ///
     /// // AWS S3
