@@ -229,11 +229,13 @@ impl Default for S3ExcelReader {
 
 /// Builder for S3ExcelReader
 ///
-/// Mirrors S3ExcelWriterBuilder pattern for consistency
+/// Supports AWS S3 and S3-compatible services (MinIO, Cloudflare R2, DigitalOcean Spaces, etc.)
 pub struct S3ExcelReaderBuilder {
     bucket: Option<String>,
     key: Option<String>,
     region: Option<String>,
+    endpoint_url: Option<String>,
+    force_path_style: bool,
 }
 
 impl Default for S3ExcelReaderBuilder {
@@ -242,6 +244,8 @@ impl Default for S3ExcelReaderBuilder {
             bucket: None,
             key: None,
             region: Some("us-east-1".to_string()),
+            endpoint_url: None,
+            force_path_style: false,
         }
     }
 }
@@ -279,6 +283,33 @@ impl S3ExcelReaderBuilder {
         self
     }
 
+    /// Set custom endpoint URL for S3-compatible services
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// // MinIO
+    /// .endpoint_url("http://localhost:9000")
+    ///
+    /// // Cloudflare R2
+    /// .endpoint_url("https://<account_id>.r2.cloudflarestorage.com")
+    ///
+    /// // DigitalOcean Spaces
+    /// .endpoint_url("https://nyc3.digitaloceanspaces.com")
+    /// ```
+    pub fn endpoint_url(mut self, endpoint: impl Into<String>) -> Self {
+        self.endpoint_url = Some(endpoint.into());
+        self
+    }
+
+    /// Force path-style addressing (required for MinIO and some S3-compatible services)
+    ///
+    /// When enabled, uses `http://endpoint/bucket/key` instead of `http://bucket.endpoint/key`
+    pub fn force_path_style(mut self, force: bool) -> Self {
+        self.force_path_style = force;
+        self
+    }
+
     /// Build the S3ExcelReader
     ///
     /// # Process
@@ -293,6 +324,30 @@ impl S3ExcelReaderBuilder {
     /// - S3 access errors (NoSuchKey, AccessDenied, etc.)
     /// - Network errors
     /// - Invalid Excel file format
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use excelstream::cloud::S3ExcelReader;
+    ///
+    /// // AWS S3
+    /// let reader = S3ExcelReader::builder()
+    ///     .bucket("my-bucket")
+    ///     .key("data.xlsx")
+    ///     .region("us-east-1")
+    ///     .build()
+    ///     .await?;
+    ///
+    /// // MinIO
+    /// let reader = S3ExcelReader::builder()
+    ///     .endpoint_url("http://localhost:9000")
+    ///     .bucket("my-bucket")
+    ///     .key("data.xlsx")
+    ///     .region("us-east-1")
+    ///     .force_path_style(true)
+    ///     .build()
+    ///     .await?;
+    /// ```
     pub async fn build(self) -> Result<S3ExcelReader> {
         // 1. Validate required fields
         let bucket = self
@@ -305,13 +360,25 @@ impl S3ExcelReaderBuilder {
 
         let region_str = self.region.unwrap_or_else(|| "us-east-1".to_string());
 
-        // 2. Initialize AWS SDK (same as S3ExcelWriter)
+        // 2. Initialize AWS SDK with custom endpoint if provided
         let region_provider = aws_sdk_s3::config::Region::new(region_str.clone());
-        let config = aws_config::defaults(aws_config::BehaviorVersion::latest())
+        let sdk_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
             .region(region_provider)
             .load()
             .await;
-        let s3_client = aws_sdk_s3::Client::new(&config);
+
+        // Build S3 client with optional endpoint URL and path style
+        let mut s3_config_builder = aws_sdk_s3::config::Builder::from(&sdk_config);
+
+        if let Some(endpoint) = &self.endpoint_url {
+            s3_config_builder = s3_config_builder.endpoint_url(endpoint);
+        }
+
+        if self.force_path_style {
+            s3_config_builder = s3_config_builder.force_path_style(true);
+        }
+
+        let s3_client = aws_sdk_s3::Client::from_conf(s3_config_builder.build());
 
         // 3. Download file from S3
         let get_object_output = s3_client

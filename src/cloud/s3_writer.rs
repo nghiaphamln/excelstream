@@ -502,10 +502,14 @@ impl S3ExcelWriter {
 }
 
 /// Builder for S3ExcelWriter
+///
+/// Supports AWS S3 and S3-compatible services (MinIO, Cloudflare R2, DigitalOcean Spaces, etc.)
 pub struct S3ExcelWriterBuilder {
     bucket: Option<String>,
     key: Option<String>,
     region: Option<String>,
+    endpoint_url: Option<String>,
+    force_path_style: bool,
 }
 
 impl Default for S3ExcelWriterBuilder {
@@ -514,6 +518,8 @@ impl Default for S3ExcelWriterBuilder {
             bucket: None,
             key: None,
             region: Some("us-east-1".to_string()),
+            endpoint_url: None,
+            force_path_style: false,
         }
     }
 }
@@ -537,7 +543,58 @@ impl S3ExcelWriterBuilder {
         self
     }
 
+    /// Set custom endpoint URL for S3-compatible services
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// // MinIO
+    /// .endpoint_url("http://localhost:9000")
+    ///
+    /// // Cloudflare R2
+    /// .endpoint_url("https://<account_id>.r2.cloudflarestorage.com")
+    ///
+    /// // DigitalOcean Spaces
+    /// .endpoint_url("https://nyc3.digitaloceanspaces.com")
+    /// ```
+    pub fn endpoint_url(mut self, endpoint: impl Into<String>) -> Self {
+        self.endpoint_url = Some(endpoint.into());
+        self
+    }
+
+    /// Force path-style addressing (required for MinIO and some S3-compatible services)
+    ///
+    /// When enabled, uses `http://endpoint/bucket/key` instead of `http://bucket.endpoint/key`
+    pub fn force_path_style(mut self, force: bool) -> Self {
+        self.force_path_style = force;
+        self
+    }
+
     /// Build the S3ExcelWriter
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use excelstream::cloud::S3ExcelWriter;
+    ///
+    /// // AWS S3
+    /// let writer = S3ExcelWriter::builder()
+    ///     .bucket("my-bucket")
+    ///     .key("report.xlsx")
+    ///     .region("us-east-1")
+    ///     .build()
+    ///     .await?;
+    ///
+    /// // MinIO
+    /// let writer = S3ExcelWriter::builder()
+    ///     .endpoint_url("http://localhost:9000")
+    ///     .bucket("my-bucket")
+    ///     .key("report.xlsx")
+    ///     .region("us-east-1")
+    ///     .force_path_style(true)
+    ///     .build()
+    ///     .await?;
+    /// ```
     #[cfg(feature = "cloud-s3")]
     pub async fn build(self) -> Result<S3ExcelWriter> {
         let bucket = self
@@ -546,22 +603,26 @@ impl S3ExcelWriterBuilder {
         let key = self
             .key
             .ok_or_else(|| ExcelError::InvalidState("Object key required".to_string()))?;
+        let region = self.region.unwrap_or_else(|| "us-east-1".to_string());
 
-        // Initialize AWS SDK
-        let sdk_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
-            .region(aws_config::Region::new(
-                self.region.unwrap_or_else(|| "us-east-1".to_string()),
-            ))
-            .load()
-            .await;
+        // Build S3 writer using s-zip builder API
+        let mut builder = S3ZipWriter::builder()
+            .region(&region)
+            .bucket(&bucket)
+            .key(&key);
 
-        let s3_config = aws_sdk_s3::config::Builder::from(&sdk_config)
-            .behavior_version(aws_sdk_s3::config::BehaviorVersion::latest())
-            .build();
-        let s3_client = aws_sdk_s3::Client::from_conf(s3_config);
+        // Set custom endpoint for S3-compatible services (MinIO, R2, etc.)
+        if let Some(endpoint) = &self.endpoint_url {
+            builder = builder.endpoint_url(endpoint);
+        }
 
-        // Create S3 writer - streams directly to S3!
-        let s3_writer = S3ZipWriter::new(s3_client, &bucket, &key)
+        // Force path-style addressing (required for MinIO)
+        if self.force_path_style {
+            builder = builder.force_path_style(true);
+        }
+
+        let s3_writer = builder
+            .build()
             .await
             .map_err(|e| ExcelError::IoError(std::io::Error::other(e.to_string())))?;
 

@@ -16,7 +16,7 @@
 - 🗜️ **Parquet Conversion** - Stream Excel ↔ Parquet with constant memory
 - 🐳 **Production Ready** - Works in 256 MB containers
 
-## 🔥 What's New in v0.15.0
+## 🔥 What's New in v0.16.0
 
 **Parquet Support** - Stream Excel ↔ Parquet with constant memory!
 
@@ -38,6 +38,8 @@ converter.convert_to_excel("output.xlsx")?;
 - ✅ **High performance** - Process millions of rows efficiently
 - ✅ **Progress callbacks** - Track conversion progress
 
+**Also new:** S3-compatible services support (MinIO, R2, Spaces, B2)!
+
 [See full changelog](CHANGELOG.md) | [Parquet examples →](examples/)
 
 ---
@@ -48,12 +50,12 @@ converter.convert_to_excel("output.xlsx")?;
 
 ```toml
 [dependencies]
-excelstream = "0.15"
+excelstream = "0.16"
 
 # Optional features
-excelstream = { version = "0.15", features = ["cloud-s3"] }        # S3 support
-excelstream = { version = "0.15", features = ["cloud-gcs"] }       # GCS support
-excelstream = { version = "0.15", features = ["parquet-support"] } # Parquet conversion
+excelstream = { version = "0.16", features = ["cloud-s3"] }        # S3 support
+excelstream = { version = "0.16", features = ["cloud-gcs"] }       # GCS support
+excelstream = { version = "0.16", features = ["parquet-support"] } # Parquet conversion
 ```
 
 ### Write Excel (Local)
@@ -162,6 +164,51 @@ Perfect for:
 
 [See S3 performance details →](PERFORMANCE_S3.md)
 
+### S3-Compatible Services (v0.16+)
+
+Stream to **MinIO, Cloudflare R2, DigitalOcean Spaces**, and other S3-compatible services:
+
+```rust
+use excelstream::cloud::{S3ExcelWriter, S3ExcelReader};
+
+// Write to MinIO
+let mut writer = S3ExcelWriter::builder()
+    .endpoint_url("http://localhost:9000")
+    .bucket("my-bucket")
+    .key("report.xlsx")
+    .region("us-east-1")
+    .force_path_style(true)  // Required for MinIO
+    .build()
+    .await?;
+
+writer.write_header_bold(["Name", "Value"]).await?;
+writer.write_row(["Test", "123"]).await?;
+writer.save().await?;
+
+// Read from MinIO
+let mut reader = S3ExcelReader::builder()
+    .endpoint_url("http://localhost:9000")
+    .bucket("my-bucket")
+    .key("data.xlsx")
+    .force_path_style(true)
+    .build()
+    .await?;
+
+for row in reader.rows("Sheet1")? {
+    println!("{:?}", row?.to_strings());
+}
+```
+
+**Supported Services:**
+
+| Service | Endpoint Example |
+|---------|------------------|
+| MinIO | `http://localhost:9000` |
+| Cloudflare R2 | `https://<account>.r2.cloudflarestorage.com` |
+| DigitalOcean Spaces | `https://nyc3.digitaloceanspaces.com` |
+| Backblaze B2 | `https://s3.us-west-000.backblazeb2.com` |
+| Linode | `https://us-east-1.linodeobjects.com` |
+
 ### GCS Direct Streaming (v0.14)
 
 Upload Excel files directly to Google Cloud Storage with **ZERO temp files**:
@@ -234,7 +281,7 @@ writer.save()?;
 
 ---
 
-## 🗜️ Parquet Support (v0.15+)
+## 🗜️ Parquet Support (v0.16+)
 
 Convert between Excel and Parquet with **constant memory** streaming:
 

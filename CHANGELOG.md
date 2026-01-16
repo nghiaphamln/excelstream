@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.15.0] - 2025-01-12
+## [0.16.0] - 2025-01-16
 
 ### 🎉 Major Features
 
@@ -58,6 +58,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Streaming Architecture**: Processes millions of rows efficiently
 - **Batch Processing**: 10K rows per batch for optimal memory/speed balance
 - **Columnar Conversion**: Efficient row-to-column and column-to-row transformations
+
+### S3-Compatible Services Support (MinIO, R2, Spaces, etc.)
+
+**New in this release**: Full support for S3-compatible storage services!
+
+- **S3ExcelWriter** now supports:
+  - `.endpoint_url()` - Custom endpoint for MinIO, Cloudflare R2, DigitalOcean Spaces, Backblaze B2
+  - `.force_path_style(true)` - Required for MinIO and some S3-compatible services
+- **S3ExcelReader** now supports:
+  - `.endpoint_url()` - Read from any S3-compatible service
+  - `.force_path_style(true)` - Path-style addressing support
+
+**Supported Services:**
+
+| Service | Endpoint Example |
+|---------|------------------|
+| MinIO | `http://localhost:9000` |
+| Cloudflare R2 | `https://<account_id>.r2.cloudflarestorage.com` |
+| DigitalOcean Spaces | `https://<region>.digitaloceanspaces.com` |
+| Backblaze B2 | `https://s3.<region>.backblazeb2.com` |
+| Linode Object Storage | `https://<region>.linodeobjects.com` |
+
+**Example (MinIO):**
+```rust
+// Write to MinIO
+let writer = S3ExcelWriter::builder()
+    .endpoint_url("http://localhost:9000")
+    .bucket("my-bucket")
+    .key("report.xlsx")
+    .region("us-east-1")
+    .force_path_style(true)
+    .build()
+    .await?;
+
+// Read from MinIO
+let reader = S3ExcelReader::builder()
+    .endpoint_url("http://localhost:9000")
+    .bucket("my-bucket")
+    .key("data.xlsx")
+    .force_path_style(true)
+    .build()
+    .await?;
+```
+
+### Dependencies
+- **s-zip**: Updated from 0.6.0 → 0.8.0
+  - New builder API for S3ZipWriter
+  - Native support for S3-compatible services
 
 ### Documentation
 - Updated README with Parquet section and examples
@@ -474,7 +522,7 @@ writer.save().await?;
 - PostgreSQL integration examples
 - Basic examples and documentation
 
-[0.15.0]: https://github.com/KSD-CO/excelstream/compare/v0.14.0...v0.15.0
+[0.16.0]: https://github.com/KSD-CO/excelstream/compare/v0.14.0...v0.16.0
 [0.14.0]: https://github.com/KSD-CO/excelstream/compare/v0.12.1...v0.14.0
 [0.2.2]: https://github.com/KSD-CO/excelstream/compare/v0.2.0...v0.2.2
 [0.2.0]: https://github.com/KSD-CO/excelstream/compare/v0.1.0...v0.2.0

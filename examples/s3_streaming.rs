@@ -29,8 +29,8 @@ use excelstream::cloud::S3ExcelWriter;
 #[cfg(feature = "cloud-s3")]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("🚀 ExcelStream S3 Direct Streaming Example (v0.5.0)");
-    println!("   Using s-zip's cloud support - NO TEMP FILES!\n");
+    println!("🚀 ExcelStream S3 Direct Streaming Example (v0.16.0)");
+    println!("   Using s-zip 0.8.0 cloud support - NO TEMP FILES!\n");
 
     // Configuration
     let bucket = std::env::var("AWS_S3_BUCKET").unwrap_or_else(|_| "my-excel-reports".to_string());
@@ -90,7 +90,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n💡 Features:");
     println!("   ✅ ZERO disk usage (no temp files!)");
     println!("   ✅ Constant ~4 KB memory for buffering");
-    println!("   ✅ Uses s-zip 0.5.0 cloud support");
+    println!("   ✅ Uses s-zip 0.8.0 cloud support");
     println!("   ✅ Async streaming with tokio");
     println!("\n🔍 Verify with:");
     println!("   aws s3 ls s3://{}/{}", bucket, key);
