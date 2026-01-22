@@ -52,6 +52,52 @@ impl S3ExcelWriter {
         S3ExcelWriterBuilder::default()
     }
 
+    /// Create S3ExcelWriter from an existing S3ZipWriter
+    ///
+    /// This allows using custom AWS SDK clients with explicit credentials.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use excelstream::cloud::S3ExcelWriter;
+    /// use s_zip::cloud::S3ZipWriter;
+    /// use aws_sdk_s3::{Client, config::Credentials};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     // Create AWS client with explicit credentials
+    ///     let creds = Credentials::new("KEY", "SECRET", None, None, "provider");
+    ///     let config = aws_sdk_s3::Config::builder()
+    ///         .credentials_provider(creds)
+    ///         .region(aws_sdk_s3::config::Region::new("us-east-1"))
+    ///         .build();
+    ///     let client = Client::from_conf(config);
+    ///
+    ///     // Create S3ZipWriter with custom client
+    ///     let s3_writer = S3ZipWriter::new(client, "bucket", "file.xlsx").await?;
+    ///
+    ///     // Wrap in S3ExcelWriter
+    ///     let mut writer = S3ExcelWriter::from_s3_writer(s3_writer);
+    ///
+    ///     writer.write_header_bold(&["Col1", "Col2"]).await?;
+    ///     writer.write_row(&["A", "B"]).await?;
+    ///     writer.save().await?;
+    ///     Ok(())
+    /// }
+    /// ```
+    #[cfg(feature = "cloud-s3")]
+    pub fn from_s3_writer(s3_writer: S3ZipWriter) -> Self {
+        Self {
+            zip_writer: Some(AsyncStreamingZipWriter::from_writer(s3_writer)),
+            current_row: 0,
+            max_col: 0,
+            xml_buffer: Vec::with_capacity(4096),
+            worksheet_count: 0,
+            worksheets: Vec::new(),
+            in_worksheet: false,
+        }
+    }
+
     async fn ensure_worksheet(&mut self) -> Result<()> {
         if !self.in_worksheet {
             self.add_worksheet("Sheet1").await?;
@@ -613,6 +659,12 @@ impl S3ExcelWriterBuilder {
         if self.force_path_style {
             builder = builder.force_path_style(true);
         }
+
+        // NOTE: Credentials are loaded from environment variables:
+        // - AWS_ACCESS_KEY_ID
+        // - AWS_SECRET_ACCESS_KEY
+        // - AWS_SESSION_TOKEN (optional, for temporary credentials)
+        // See MULTI_CLOUD_CONFIG.md for multi-cloud setup
 
         let s3_writer = builder
             .build()

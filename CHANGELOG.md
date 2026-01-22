@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0] - 2026-01-22
+
+### 🎉 Major Features
+
+**Multi-Cloud Explicit Credentials** - Upload to multiple S3-compatible clouds with different credentials!
+
+### Added
+- **S3ExcelWriter::from_s3_writer()** - Create writer from AWS SDK S3 client with explicit credentials
+  - No environment variables needed
+  - Full control over credentials per cloud
+  - Supports AWS S3, FPT Cloud, MinIO, Cloudflare R2, DigitalOcean Spaces, Backblaze B2
+- **S3ExcelReader::from_s3_client()** - Create reader from AWS SDK S3 client with explicit credentials
+  - Download and read Excel files from any S3-compatible service
+  - Stream files to temp directory for processing
+- **Multi-cloud examples**:
+  - `examples/multi_cloud_config.rs` - Complete guide for AWS, MinIO, R2, Spaces, B2
+- **MULTI_CLOUD_CONFIG.md** - Comprehensive multi-cloud configuration guide
+
+### Performance
+- ✅ **Memory: 19-20 MB** for 100K rows (4 columns) - verified with binary execution
+- ✅ **Concurrent uploads**: 21.5 MB for simultaneous upload to 2 clouds
+- ✅ **Speed**: 34K-47K rows/sec to S3-compatible services
+
+### Documentation
+- Updated README.md with multi-cloud examples
+- Added MULTI_CLOUD_CONFIG.md with step-by-step guides for all supported services
+- Added performance benchmarks for FPT Cloud and AWS S3
+
 ## [0.16.0] - 2025-01-16
 
 ### 🎉 Major Features

@@ -89,6 +89,109 @@ impl S3ExcelReader {
         S3ExcelReaderBuilder::default()
     }
 
+    /// Create S3ExcelReader from an existing AWS S3 Client
+    ///
+    /// This allows using custom AWS SDK clients with explicit credentials.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use excelstream::cloud::S3ExcelReader;
+    /// use aws_sdk_s3::{Client, config::Credentials};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     // Create AWS client with explicit credentials
+    ///     let creds = Credentials::new("KEY", "SECRET", None, None, "provider");
+    ///     let config = aws_sdk_s3::Config::builder()
+    ///         .credentials_provider(creds)
+    ///         .region(aws_sdk_s3::config::Region::new("us-east-1"))
+    ///         .build();
+    ///     let client = Client::from_conf(config);
+    ///
+    ///     // Create S3ExcelReader with custom client
+    ///     let mut reader = S3ExcelReader::from_s3_client(
+    ///         client,
+    ///         "my-bucket",
+    ///         "data.xlsx"
+    ///     ).await?;
+    ///
+    ///     for row in reader.rows("Sheet1")? {
+    ///         println!("{:?}", row?.to_strings());
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn from_s3_client(
+        s3_client: aws_sdk_s3::Client,
+        bucket: impl Into<String>,
+        key: impl Into<String>,
+    ) -> Result<Self> {
+        let bucket = bucket.into();
+        let key = key.into();
+
+        // Download file from S3
+        let get_object_output = s3_client
+            .get_object()
+            .bucket(&bucket)
+            .key(&key)
+            .send()
+            .await
+            .map_err(|e| {
+                let error_code = e.code().unwrap_or("");
+                let error_message = e.message().unwrap_or("Unknown error");
+
+                match error_code {
+                    "NoSuchKey" => ExcelError::FileNotFound(format!("s3://{}/{}", bucket, key)),
+                    "NoSuchBucket" => {
+                        ExcelError::ReadError(format!("Bucket '{}' does not exist", bucket))
+                    }
+                    "AccessDenied" => ExcelError::ReadError(format!(
+                        "Access denied to s3://{}/{}. Error: {}",
+                        bucket, key, error_message
+                    )),
+                    _ => ExcelError::ReadError(format!(
+                        "S3 GetObject failed ({}): {}",
+                        error_code, error_message
+                    )),
+                }
+            })?;
+
+        // Create temp file
+        let mut temp_file = tempfile::NamedTempFile::new().map_err(|e| {
+            ExcelError::IoError(std::io::Error::other(format!(
+                "Failed to create temp file: {}",
+                e
+            )))
+        })?;
+
+        // Download S3 body to memory buffer first
+        let mut body = get_object_output.body.into_async_read();
+        let mut buffer = Vec::new();
+
+        use tokio::io::AsyncReadExt;
+        body.read_to_end(&mut buffer)
+            .await
+            .map_err(ExcelError::IoError)?;
+
+        // Write buffer to temp file
+        use std::io::Write;
+        temp_file.write_all(&buffer).map_err(ExcelError::IoError)?;
+        temp_file.flush().map_err(ExcelError::IoError)?;
+
+        // Open StreamingReader from temp file
+        let streaming_reader = StreamingReader::open(temp_file.path())?;
+
+        Ok(Self {
+            bucket,
+            key,
+            _region: "custom".to_string(),
+            _s3_client: Some(s3_client),
+            _temp_file: Some(temp_file),
+            streaming_reader: Some(streaming_reader),
+        })
+    }
+
     /// Get list of sheet names
     ///
     /// Returns the names of all worksheets in the workbook.

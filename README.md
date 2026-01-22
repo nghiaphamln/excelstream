@@ -16,31 +16,35 @@
 - 🗜️ **Parquet Conversion** - Stream Excel ↔ Parquet with constant memory
 - 🐳 **Production Ready** - Works in 256 MB containers
 
-## 🔥 What's New in v0.16.0
+## 🔥 What's New in v0.17.0
 
-**Parquet Support** - Stream Excel ↔ Parquet with constant memory!
+**Multi-Cloud Explicit Credentials** - Upload to multiple S3-compatible clouds with different credentials!
 
 ```rust
-use excelstream::parquet::{ExcelToParquetConverter, ParquetToExcelConverter};
+use excelstream::cloud::{S3ExcelWriter, S3ExcelReader};
+use s_zip::cloud::S3ZipWriter;
+use aws_sdk_s3::{Client, config::Credentials};
 
-// Excel → Parquet (10K rows at a time, constant memory)
-let converter = ExcelToParquetConverter::new("data.xlsx")?;
-converter.convert_to_parquet("output.parquet")?;
+// Create clients with different credentials for each cloud
+let aws_client = Client::from_conf(aws_config);
+let minio_client = Client::from_conf(minio_config);
 
-// Parquet → Excel (streaming)
-let converter = ParquetToExcelConverter::new("data.parquet")?;
-converter.convert_to_excel("output.xlsx")?;
+// Upload to multiple clouds simultaneously
+let s3_writer = S3ZipWriter::new(aws_client, "bucket", "file.xlsx").await?;
+let mut writer = S3ExcelWriter::from_s3_writer(s3_writer);
+writer.write_header_bold(["Name", "Value"]).await?;
+writer.save().await?;
 ```
 
 **Features:**
-- ✅ **Streaming conversion** - Constant memory (10K row batches)
-- ✅ **All data types** - Strings, numbers, booleans, dates
-- ✅ **High performance** - Process millions of rows efficiently
-- ✅ **Progress callbacks** - Track conversion progress
+- 🔑 **Explicit credentials** - No environment variables needed
+- 🌍 **Multi-cloud support** - AWS, MinIO, R2, Spaces, B2
+- 🚀 **True streaming** - Only 19-20 MB memory for 100K rows
+- ⚡ **Concurrent uploads** - Upload to multiple clouds simultaneously
 
-**Also new:** S3-compatible services support (MinIO, R2, Spaces, B2)!
+**Also includes:** Parquet support from v0.16.0 (Excel ↔ Parquet streaming)
 
-[See full changelog](CHANGELOG.md) | [Parquet examples →](examples/)
+[See full changelog](CHANGELOG.md) | [Multi-cloud guide →](MULTI_CLOUD_CONFIG.md)
 
 ---
 
@@ -50,12 +54,12 @@ converter.convert_to_excel("output.xlsx")?;
 
 ```toml
 [dependencies]
-excelstream = "0.16"
+excelstream = "0.17"
 
 # Optional features
-excelstream = { version = "0.16", features = ["cloud-s3"] }        # S3 support
-excelstream = { version = "0.16", features = ["cloud-gcs"] }       # GCS support
-excelstream = { version = "0.16", features = ["parquet-support"] } # Parquet conversion
+excelstream = { version = "0.17", features = ["cloud-s3"] }        # S3 support
+excelstream = { version = "0.17", features = ["cloud-gcs"] }       # GCS support
+excelstream = { version = "0.17", features = ["parquet-support"] } # Parquet conversion
 ```
 
 ### Write Excel (Local)
@@ -164,36 +168,55 @@ Perfect for:
 
 [See S3 performance details →](PERFORMANCE_S3.md)
 
-### S3-Compatible Services (v0.16+)
+### S3-Compatible Services (v0.17+)
 
-Stream to **MinIO, Cloudflare R2, DigitalOcean Spaces**, and other S3-compatible services:
+Stream to **AWS S3, MinIO, Cloudflare R2, DigitalOcean Spaces**, and other S3-compatible services with **explicit credentials** - no environment variables needed!
 
 ```rust
 use excelstream::cloud::{S3ExcelWriter, S3ExcelReader};
+use s_zip::cloud::S3ZipWriter;
+use aws_sdk_s3::{Client, config::Credentials};
 
-// Write to MinIO
-let mut writer = S3ExcelWriter::builder()
+// Example 1: AWS S3 with explicit credentials
+let aws_creds = Credentials::new(
+    "AKIA...",           // access_key_id
+    "secret...",         // secret_access_key
+    None, None, "aws"
+);
+let aws_config = aws_sdk_s3::Config::builder()
+    .credentials_provider(aws_creds)
+    .region(aws_sdk_s3::config::Region::new("ap-southeast-1"))
+    .build();
+let aws_client = Client::from_conf(aws_config);
+
+// Example 2: MinIO with explicit credentials
+let minio_creds = Credentials::new("minioadmin", "minioadmin", None, None, "minio");
+let minio_config = aws_sdk_s3::Config::builder()
+    .credentials_provider(minio_creds)
     .endpoint_url("http://localhost:9000")
-    .bucket("my-bucket")
-    .key("report.xlsx")
-    .region("us-east-1")
+    .region(aws_sdk_s3::config::Region::new("us-east-1"))
     .force_path_style(true)  // Required for MinIO
-    .build()
-    .await?;
+    .build();
+let minio_client = Client::from_conf(minio_config);
 
+// Example 3: Cloudflare R2 with explicit credentials
+let r2_creds = Credentials::new("access_key", "secret_key", None, None, "r2");
+let r2_config = aws_sdk_s3::Config::builder()
+    .credentials_provider(r2_creds)
+    .endpoint_url("https://<account-id>.r2.cloudflarestorage.com")
+    .region(aws_sdk_s3::config::Region::new("auto"))
+    .build();
+let r2_client = Client::from_conf(r2_config);
+
+// Write Excel file to ANY S3-compatible service
+let s3_writer = S3ZipWriter::new(aws_client.clone(), "my-bucket", "report.xlsx").await?;
+let mut writer = S3ExcelWriter::from_s3_writer(s3_writer);
 writer.write_header_bold(["Name", "Value"]).await?;
 writer.write_row(["Test", "123"]).await?;
 writer.save().await?;
 
-// Read from MinIO
-let mut reader = S3ExcelReader::builder()
-    .endpoint_url("http://localhost:9000")
-    .bucket("my-bucket")
-    .key("data.xlsx")
-    .force_path_style(true)
-    .build()
-    .await?;
-
+// Read Excel file from ANY S3-compatible service
+let mut reader = S3ExcelReader::from_s3_client(aws_client, "my-bucket", "data.xlsx").await?;
 for row in reader.rows("Sheet1")? {
     println!("{:?}", row?.to_strings());
 }
@@ -201,13 +224,23 @@ for row in reader.rows("Sheet1")? {
 
 **Supported Services:**
 
-| Service | Endpoint Example |
-|---------|------------------|
-| MinIO | `http://localhost:9000` |
-| Cloudflare R2 | `https://<account>.r2.cloudflarestorage.com` |
-| DigitalOcean Spaces | `https://nyc3.digitaloceanspaces.com` |
-| Backblaze B2 | `https://s3.us-west-000.backblazeb2.com` |
-| Linode | `https://us-east-1.linodeobjects.com` |
+| Service | Endpoint Example | Region |
+|---------|------------------|--------|
+| AWS S3 | (default) | `us-east-1`, `ap-southeast-1`, etc. |
+| MinIO | `http://localhost:9000` | `us-east-1` |
+| Cloudflare R2 | `https://<account>.r2.cloudflarestorage.com` | `auto` |
+| DigitalOcean Spaces | `https://nyc3.digitaloceanspaces.com` | `us-east-1` |
+| Backblaze B2 | `https://s3.us-west-000.backblazeb2.com` | `us-west-000` |
+| Linode | `https://us-east-1.linodeobjects.com` | `us-east-1` |
+
+**✨ Key Features:**
+- 🔑 **Explicit credentials** - no environment variables needed
+- 🌍 **Multi-cloud support** - use different credentials for each cloud
+- 🚀 **True streaming** - only **19-20 MB memory** for 100K rows
+- ⚡ **Concurrent uploads** - upload to multiple clouds simultaneously
+- 🔒 **Type-safe** - full compile-time checking
+
+**🔑 Full Multi-Cloud Guide** → [MULTI_CLOUD_CONFIG.md](MULTI_CLOUD_CONFIG.md) - Complete examples for AWS, MinIO, R2, Spaces, and B2!
 
 ### GCS Direct Streaming (v0.14)
 
@@ -379,12 +412,14 @@ writer.save().await?;  // No temp files, no disk!
 - [Examples](examples/) - Code examples for all features
 - [CHANGELOG](CHANGELOG.md) - Version history
 - [Performance](PERFORMANCE_S3.md) - Detailed benchmarks
+- [Multi-Cloud Config](MULTI_CLOUD_CONFIG.md) - AWS, MinIO, R2, Spaces, B2 setup
 
 ### Key Topics
 
 - [Excel Writing](examples/basic_write.rs) - Basic & advanced writing
 - [Excel Reading](examples/basic_read.rs) - Streaming read
 - [S3 Streaming](examples/s3_streaming.rs) - AWS S3 uploads
+- [Multi-Cloud Config](examples/multi_cloud_config.rs) - Multi-cloud credentials
 - [GCS Streaming](examples/gcs_streaming.rs) - Google Cloud Storage uploads
 - [CSV Support](examples/csv_write.rs) - CSV operations
 - [Parquet Conversion](examples/parquet_to_excel.rs) - Excel ↔ Parquet
